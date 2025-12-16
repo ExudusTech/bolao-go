@@ -1,0 +1,104 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Header } from "@/components/layout/Header";
+import { AuthGuard } from "@/components/layout/AuthGuard";
+import { BolaoCard } from "@/components/bolao/BolaoCard";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { Plus, Loader2, FolderOpen } from "lucide-react";
+
+interface Bolao {
+  id: string;
+  nome_do_bolao: string;
+  total_apostas: number;
+  created_at: string;
+}
+
+export default function Dashboard() {
+  const { user } = useAuth();
+  const [boloes, setBoloes] = useState<Bolao[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (user) {
+      fetchBoloes();
+    }
+  }, [user]);
+
+  const fetchBoloes = async () => {
+    const { data, error } = await supabase
+      .from("boloes")
+      .select("id, nome_do_bolao, total_apostas, created_at")
+      .eq("gestor_id", user?.id)
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setBoloes(data);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <AuthGuard>
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container py-8 px-4">
+          <div className="flex flex-col gap-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Seus Bolões</h1>
+                <p className="text-muted-foreground">
+                  Gerencie seus bolões e acompanhe as apostas
+                </p>
+              </div>
+              <Button asChild className="hover-scale">
+                <Link to="/bolao/criar">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Criar Novo Bolão
+                </Link>
+              </Button>
+            </div>
+
+            {/* Content */}
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : boloes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+                <div className="mb-4 rounded-full bg-muted p-4">
+                  <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-lg font-semibold">Nenhum bolão criado</h2>
+                <p className="text-muted-foreground mb-4">
+                  Crie seu primeiro bolão e comece a receber apostas
+                </p>
+                <Button asChild>
+                  <Link to="/bolao/criar">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Criar Bolão
+                  </Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {boloes.map((bolao, index) => (
+                  <BolaoCard
+                    key={bolao.id}
+                    id={bolao.id}
+                    nome={bolao.nome_do_bolao}
+                    totalApostas={bolao.total_apostas}
+                    createdAt={bolao.created_at}
+                    index={index}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+    </AuthGuard>
+  );
+}
