@@ -41,7 +41,9 @@ export function BetsTable({ bets }: BetsTableProps) {
               style={{ animationDelay: `${index * 40}ms` }}
             >
               <TableCell className="font-medium">{bet.apelido}</TableCell>
-              <TableCell className="text-muted-foreground">{bet.celular}</TableCell>
+              <TableCell className="text-muted-foreground">
+                ****-****-{bet.celular.slice(-4)}
+              </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">
                   {bet.dezenas.sort((a, b) => a - b).map((num) => (
