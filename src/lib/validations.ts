@@ -20,9 +20,9 @@ export const createBolaoSchema = z.object({
 export const apostasSchema = z.object({
   apelido: z.string().min(2, "Apelido deve ter no mínimo 2 caracteres").max(50, "Apelido muito longo"),
   celular: z.string()
-    .min(10, "Celular inválido")
-    .max(15, "Celular muito longo")
-    .regex(/^[\d\s\-\(\)\+]+$/, "Celular inválido"),
+    .transform((val) => val.replace(/\D/g, '')) // Strip all non-digits
+    .refine((val) => val.length >= 10 && val.length <= 11, "Celular deve ter 10 ou 11 dígitos")
+    .refine((val) => /^[1-9]{2}9?\d{8}$/.test(val), "Formato de celular brasileiro inválido"),
   dezenas: z.array(z.number().min(1, "Número inválido").max(60, "Número deve ser entre 1 e 60"))
     .length(6, "Selecione exatamente 6 números")
     .refine((arr) => new Set(arr).size === 6, "Os números devem ser diferentes"),
