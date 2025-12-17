@@ -25,6 +25,8 @@ interface Aposta {
   celular: string;
   dezenas: number[];
   created_at: string;
+  payment_status: string;
+  receipt_url: string | null;
 }
 
 export default function BolaoDetalhes() {
@@ -211,7 +213,7 @@ export default function BolaoDetalhes() {
                 <CardTitle>Apostas Registradas</CardTitle>
               </CardHeader>
               <CardContent>
-                <BetsTable bets={apostas} />
+                <BetsTable bets={apostas} onPaymentUpdate={fetchData} />
               </CardContent>
             </Card>
           </div>
