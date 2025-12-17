@@ -12,9 +12,7 @@ interface Bolao {
   chave_pix: string;
   observacoes: string | null;
   total_apostas: number;
-  profiles: {
-    name: string;
-  } | null;
+  gestor_name: string | null;
 }
 
 export default function Participar() {
@@ -26,22 +24,14 @@ export default function Participar() {
   const fetchBolao = useCallback(async () => {
     if (!id) return;
 
+    // Use RPC function to prevent enumeration - only fetches by exact ID
     const { data, error } = await supabase
-      .from("boloes")
-      .select(`
-        id,
-        nome_do_bolao,
-        chave_pix,
-        observacoes,
-        total_apostas,
-        profiles:gestor_id (name)
-      `)
-      .eq("id", id)
-      .maybeSingle();
+      .rpc("get_bolao_for_participation", { bolao_id: id });
 
-    if (!error && data) {
-      setBolao(data);
-      setCounter(data.total_apostas);
+    if (!error && data && data.length > 0) {
+      const bolaoData = data[0];
+      setBolao(bolaoData);
+      setCounter(bolaoData.total_apostas);
     }
     setLoading(false);
   }, [id]);
@@ -112,9 +102,9 @@ export default function Participar() {
           </Badge>
 
           {/* Organizer Info */}
-          {bolao.profiles?.name && (
+          {bolao.gestor_name && (
             <p className="text-sm text-muted-foreground animate-fade-in">
-              Organizado por <span className="font-medium text-foreground">{bolao.profiles.name}</span>
+              Organizado por <span className="font-medium text-foreground">{bolao.gestor_name}</span>
             </p>
           )}
 
