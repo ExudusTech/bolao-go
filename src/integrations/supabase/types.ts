@@ -71,6 +71,7 @@ export type Database = {
           observacoes: string | null
           total_apostas: number
           updated_at: string
+          valor_cota: number
         }
         Insert: {
           chave_pix: string
@@ -81,6 +82,7 @@ export type Database = {
           observacoes?: string | null
           total_apostas?: number
           updated_at?: string
+          valor_cota?: number
         }
         Update: {
           chave_pix?: string
@@ -91,6 +93,7 @@ export type Database = {
           observacoes?: string | null
           total_apostas?: number
           updated_at?: string
+          valor_cota?: number
         }
         Relationships: [
           {

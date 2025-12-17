@@ -14,6 +14,7 @@ export const registerSchema = z.object({
 export const createBolaoSchema = z.object({
   nome_do_bolao: z.string().min(3, "Nome deve ter no mínimo 3 caracteres").max(100, "Nome muito longo"),
   chave_pix: z.string().min(1, "Chave PIX obrigatória").max(100, "Chave PIX muito longa"),
+  valor_cota: z.number().min(1, "Valor mínimo é R$ 1,00").max(1000, "Valor máximo é R$ 1.000,00"),
   observacoes: z.string().max(500, "Observações muito longas").optional(),
 });
 

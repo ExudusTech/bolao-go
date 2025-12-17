@@ -28,6 +28,7 @@ export default function CriarBolao() {
     defaultValues: {
       nome_do_bolao: "",
       chave_pix: "",
+      valor_cota: 10,
       observacoes: "",
     },
   });
@@ -43,6 +44,7 @@ export default function CriarBolao() {
         gestor_id: user.id,
         nome_do_bolao: data.nome_do_bolao.trim(),
         chave_pix: data.chave_pix.trim(),
+        valor_cota: data.valor_cota,
         observacoes: data.observacoes?.trim() || null,
       })
       .select("id")
@@ -127,10 +129,29 @@ export default function CriarBolao() {
                     </div>
 
                     <div className="space-y-2">
+                      <Label htmlFor="valor">Valor da Cota (R$) *</Label>
+                      <Input
+                        id="valor"
+                        type="number"
+                        step="0.01"
+                        min="1"
+                        max="1000"
+                        placeholder="10.00"
+                        {...form.register("valor_cota", { valueAsNumber: true })}
+                        disabled={isLoading}
+                      />
+                      {form.formState.errors.valor_cota && (
+                        <p className="text-sm text-destructive">
+                          {form.formState.errors.valor_cota.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
                       <Label htmlFor="obs">Observações (opcional)</Label>
                       <Textarea
                         id="obs"
-                        placeholder="Informações adicionais como valor da cota, regras, etc."
+                        placeholder="Informações adicionais como regras, data do sorteio, etc."
                         rows={3}
                         {...form.register("observacoes")}
                         disabled={isLoading}
