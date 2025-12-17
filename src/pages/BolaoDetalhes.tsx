@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText } from "lucide-react";
+import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles } from "lucide-react";
 
 interface Bolao {
   id: string;
@@ -16,6 +16,7 @@ interface Bolao {
   chave_pix: string;
   observacoes: string | null;
   total_apostas: number;
+  valor_cota: number;
   created_at: string;
 }
 
@@ -36,6 +37,8 @@ export default function BolaoDetalhes() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestions, setSuggestions] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -61,6 +64,9 @@ export default function BolaoDetalhes() {
     fetchData();
   }, [fetchData]);
 
+  const paidApostas = apostas.filter(a => a.payment_status === 'paid');
+  const totalArrecadado = paidApostas.length * (bolao?.valor_cota || 0);
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchData();
@@ -78,8 +84,6 @@ export default function BolaoDetalhes() {
   };
 
   const handleExportCSV = () => {
-    const paidApostas = apostas.filter(a => a.payment_status === 'paid');
-    
     if (paidApostas.length === 0) {
       toast.error("Não há apostas pagas para exportar");
       return;
@@ -110,6 +114,63 @@ export default function BolaoDetalhes() {
 
     setExporting(false);
     toast.success(`${paidApostas.length} apostas pagas exportadas!`);
+  };
+
+  const handleGetSuggestions = async () => {
+    if (paidApostas.length === 0) {
+      toast.error("É necessário ter apostas pagas para gerar sugestões");
+      return;
+    }
+
+    setLoadingSuggestions(true);
+    setSuggestions(null);
+
+    // Get most common dezenas from paid apostas
+    const dezenaCount: Record<number, number> = {};
+    paidApostas.forEach(a => {
+      a.dezenas.forEach(d => {
+        dezenaCount[d] = (dezenaCount[d] || 0) + 1;
+      });
+    });
+    const topDezenas = Object.entries(dezenaCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([d]) => parseInt(d));
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-games`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          totalArrecadado,
+          quantidadeApostasPagas: paidApostas.length,
+          dezenasSelecionadas: topDezenas,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast.error("Limite de requisições excedido. Tente novamente em alguns minutos.");
+          return;
+        }
+        if (response.status === 402) {
+          toast.error("Créditos insuficientes. Entre em contato com o suporte.");
+          return;
+        }
+        throw new Error("Erro ao gerar sugestões");
+      }
+
+      const data = await response.json();
+      setSuggestions(data.suggestion);
+    } catch (error) {
+      console.error("Error getting suggestions:", error);
+      toast.error("Erro ao gerar sugestões de jogos");
+    } finally {
+      setLoadingSuggestions(false);
+    }
   };
 
   if (loading) {
@@ -165,20 +226,34 @@ export default function BolaoDetalhes() {
                       Criado em {new Date(bolao.created_at).toLocaleDateString("pt-BR")}
                     </CardDescription>
                   </div>
-                  <Badge variant="secondary" className="flex items-center gap-2 text-lg px-4 py-2 bg-primary/10 text-primary">
-                    <Users className="h-5 w-5" />
-                    <span className="font-bold animate-count">{bolao.total_apostas}</span>
-                    <span className="text-sm font-normal">apostas</span>
-                  </Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-2 text-lg px-4 py-2 bg-primary/10 text-primary">
+                      <Users className="h-5 w-5" />
+                      <span className="font-bold">{bolao.total_apostas}</span>
+                      <span className="text-sm font-normal">apostas</span>
+                    </Badge>
+                    <Badge variant="secondary" className="flex items-center gap-2 text-lg px-4 py-2 bg-success/10 text-success">
+                      <DollarSign className="h-5 w-5" />
+                      <span className="font-bold">R$ {totalArrecadado.toFixed(2)}</span>
+                      <span className="text-sm font-normal">arrecadado</span>
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-3">
                   <div className="flex items-start gap-2">
                     <Key className="h-4 w-4 mt-1 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium">Chave PIX</p>
                       <p className="text-muted-foreground">{bolao.chave_pix}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <DollarSign className="h-4 w-4 mt-1 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium">Valor da Cota</p>
+                      <p className="text-muted-foreground">R$ {bolao.valor_cota.toFixed(2)}</p>
                     </div>
                   </div>
                   {bolao.observacoes && (
@@ -192,6 +267,21 @@ export default function BolaoDetalhes() {
                   )}
                 </div>
 
+                <div className="p-3 rounded-lg bg-muted/50 border">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Resumo de Pagamentos</p>
+                      <p className="text-muted-foreground text-sm">
+                        {paidApostas.length} de {apostas.length} apostas pagas
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-success">R$ {totalArrecadado.toFixed(2)}</p>
+                      <p className="text-xs text-muted-foreground">Total arrecadado</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button variant="outline" size="sm" onClick={handleCopyLink} className="hover-scale">
                     <Copy className="h-4 w-4 mr-2" />
@@ -201,13 +291,46 @@ export default function BolaoDetalhes() {
                     <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
                     Atualizar Lista
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={exporting || apostas.length === 0} className="hover-scale">
+                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={exporting || paidApostas.length === 0} className="hover-scale">
                     <Download className={`h-4 w-4 mr-2 ${exporting ? "animate-spin" : ""}`} />
                     Exportar CSV
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={handleGetSuggestions} 
+                    disabled={loadingSuggestions || paidApostas.length === 0}
+                    className="hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
+                  >
+                    {loadingSuggestions ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    Sugerir Jogos com IA
                   </Button>
                 </div>
               </CardContent>
             </Card>
+
+            {/* AI Suggestions */}
+            {suggestions && (
+              <Card className="animate-fade-in border-accent/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-accent">
+                    <Sparkles className="h-5 w-5" />
+                    Sugestões de Jogos
+                  </CardTitle>
+                  <CardDescription>
+                    Baseado em R$ {totalArrecadado.toFixed(2)} arrecadados de {paidApostas.length} apostas
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
+                    {suggestions}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Bets Table */}
             <Card>
