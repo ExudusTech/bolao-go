@@ -26,6 +26,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
   const [honeypot, setHoneypot] = useState("");
   const [hasSubmittedBet, setHasSubmittedBet] = useState(false);
   const [participantInfo, setParticipantInfo] = useState<{ apelido: string; celular: string } | null>(null);
+  const [sessionBets, setSessionBets] = useState<number[][]>([]);
 
   const form = useForm<ApostaInput>({
     resolver: zodResolver(apostasSchema),
@@ -94,6 +95,9 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
       setParticipantInfo({ apelido, celular });
     }
     
+    // Track bet in session
+    setSessionBets(prev => [...prev, [...selectedNumbers]]);
+    
     setHasSubmittedBet(true);
     setSelectedNumbers([]);
     onSuccess();
@@ -118,8 +122,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
       <CardContent>
         {hasSubmittedBet && participantInfo ? (
           // Success state - show option to register new bet
-          <div className="space-y-6 text-center">
-            <div className="p-6 rounded-lg bg-primary/10 border border-primary/20">
+          <div className="space-y-6">
+            <div className="p-6 rounded-lg bg-primary/10 border border-primary/20 text-center">
               <Check className="h-12 w-12 text-primary mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-foreground mb-2">
                 Aposta registrada com sucesso!
@@ -128,6 +132,33 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
                 Olá, <span className="font-medium text-foreground">{participantInfo.apelido}</span>! 
                 Sua aposta foi confirmada.
               </p>
+            </div>
+
+            {/* Session Bets Summary */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-foreground">
+                Suas apostas nesta sessão ({sessionBets.length} {sessionBets.length === 1 ? 'aposta' : 'apostas'}):
+              </h4>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {sessionBets.map((bet, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border"
+                  >
+                    <span className="text-xs text-muted-foreground w-6">#{index + 1}</span>
+                    <div className="flex flex-wrap gap-1">
+                      {bet.map((num) => (
+                        <span
+                          key={num}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/80 text-primary-foreground font-medium text-xs"
+                        >
+                          {num.toString().padStart(2, "0")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
             
             <Button
