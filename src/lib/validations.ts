@@ -11,9 +11,38 @@ export const registerSchema = z.object({
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
 });
 
+export const LOTTERY_TYPES = {
+  megasena: {
+    name: "Mega-Sena",
+    minNumbers: 6,
+    maxNumbers: 20,
+    numberRange: 60,
+    prices: {
+      6: 5.00,
+      7: 35.00,
+      8: 140.00,
+      9: 420.00,
+      10: 1050.00,
+      11: 2310.00,
+      12: 4620.00,
+      13: 8580.00,
+      14: 15015.00,
+      15: 25025.00,
+      16: 40040.00,
+      17: 61880.00,
+      18: 92820.00,
+      19: 135660.00,
+      20: 193800.00,
+    },
+  },
+} as const;
+
+export type LotteryType = keyof typeof LOTTERY_TYPES;
+
 export const createBolaoSchema = z.object({
   nome_do_bolao: z.string().min(3, "Nome deve ter no mínimo 3 caracteres").max(100, "Nome muito longo"),
   chave_pix: z.string().min(1, "Chave PIX obrigatória").max(100, "Chave PIX muito longa"),
+  tipo_loteria: z.enum(["megasena"]).default("megasena"),
   valor_cota: z.number().min(1, "Valor mínimo é R$ 1,00").max(1000, "Valor máximo é R$ 1.000,00"),
   observacoes: z.string().max(500, "Observações muito longas").optional(),
 });

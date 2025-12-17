@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { createBolaoSchema, CreateBolaoInput } from "@/lib/validations";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createBolaoSchema, CreateBolaoInput, LOTTERY_TYPES } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ export default function CriarBolao() {
     defaultValues: {
       nome_do_bolao: "",
       chave_pix: "",
+      tipo_loteria: "megasena",
       valor_cota: 10,
       observacoes: "",
     },
@@ -44,6 +46,7 @@ export default function CriarBolao() {
         gestor_id: user.id,
         nome_do_bolao: data.nome_do_bolao.trim(),
         chave_pix: data.chave_pix.trim(),
+        tipo_loteria: data.tipo_loteria,
         valor_cota: data.valor_cota,
         observacoes: data.observacoes?.trim() || null,
       })
@@ -109,6 +112,31 @@ export default function CriarBolao() {
                       {form.formState.errors.nome_do_bolao && (
                         <p className="text-sm text-destructive">
                           {form.formState.errors.nome_do_bolao.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="tipo">Tipo de Loteria *</Label>
+                      <Select
+                        value={form.watch("tipo_loteria")}
+                        onValueChange={(value) => form.setValue("tipo_loteria", value as "megasena")}
+                        disabled={isLoading}
+                      >
+                        <SelectTrigger id="tipo">
+                          <SelectValue placeholder="Selecione a loteria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(LOTTERY_TYPES).map(([key, lottery]) => (
+                            <SelectItem key={key} value={key}>
+                              {lottery.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {form.formState.errors.tipo_loteria && (
+                        <p className="text-sm text-destructive">
+                          {form.formState.errors.tipo_loteria.message}
                         </p>
                       )}
                     </div>

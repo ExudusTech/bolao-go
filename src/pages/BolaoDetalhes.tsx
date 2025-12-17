@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles } from "lucide-react";
+import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket } from "lucide-react";
+import { LOTTERY_TYPES } from "@/lib/validations";
 
 interface Bolao {
   id: string;
@@ -17,6 +18,7 @@ interface Bolao {
   observacoes: string | null;
   total_apostas: number;
   valor_cota: number;
+  tipo_loteria: string;
   created_at: string;
 }
 
@@ -125,17 +127,14 @@ export default function BolaoDetalhes() {
     setLoadingSuggestions(true);
     setSuggestions(null);
 
-    // Get most common dezenas from paid apostas
-    const dezenaCount: Record<number, number> = {};
-    paidApostas.forEach(a => {
-      a.dezenas.forEach(d => {
-        dezenaCount[d] = (dezenaCount[d] || 0) + 1;
-      });
-    });
-    const topDezenas = Object.entries(dezenaCount)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([d]) => parseInt(d));
+    // Get all paid bets with their numbers
+    const apostasParaIA = paidApostas.map(a => ({
+      apelido: a.apelido,
+      dezenas: a.dezenas.sort((x, y) => x - y),
+    }));
+
+    const lotteryType = bolao?.tipo_loteria || "megasena";
+    const lotteryConfig = LOTTERY_TYPES[lotteryType as keyof typeof LOTTERY_TYPES];
 
     try {
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-games`, {
@@ -146,8 +145,9 @@ export default function BolaoDetalhes() {
         },
         body: JSON.stringify({
           totalArrecadado,
-          quantidadeApostasPagas: paidApostas.length,
-          dezenasSelecionadas: topDezenas,
+          tipoLoteria: lotteryType,
+          lotteryConfig,
+          apostas: apostasParaIA,
         }),
       });
 
@@ -219,11 +219,12 @@ export default function BolaoDetalhes() {
             {/* Bolao Info Card */}
             <Card className="animate-fade-in">
               <CardHeader>
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div className="space-y-1">
                     <CardTitle className="text-2xl">{bolao.nome_do_bolao}</CardTitle>
-                    <CardDescription>
-                      Criado em {new Date(bolao.created_at).toLocaleDateString("pt-BR")}
+                    <CardDescription className="flex items-center gap-2">
+                      <Ticket className="h-4 w-4" />
+                      {LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || bolao.tipo_loteria} • Criado em {new Date(bolao.created_at).toLocaleDateString("pt-BR")}
                     </CardDescription>
                   </div>
                   <div className="flex flex-wrap gap-2">
