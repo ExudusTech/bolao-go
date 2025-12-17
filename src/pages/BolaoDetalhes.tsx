@@ -78,15 +78,17 @@ export default function BolaoDetalhes() {
   };
 
   const handleExportCSV = () => {
-    if (apostas.length === 0) {
-      toast.error("Não há apostas para exportar");
+    const paidApostas = apostas.filter(a => a.payment_status === 'paid');
+    
+    if (paidApostas.length === 0) {
+      toast.error("Não há apostas pagas para exportar");
       return;
     }
 
     setExporting(true);
 
     const headers = ["Apelido", "Celular", "Dezenas", "Data/Hora"];
-    const rows = apostas.map((a) => [
+    const rows = paidApostas.map((a) => [
       a.apelido,
       a.celular,
       a.dezenas.sort((x, y) => x - y).map(n => n.toString().padStart(2, "0")).join(", "),
@@ -102,12 +104,12 @@ export default function BolaoDetalhes() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${bolao?.nome_do_bolao || "bolao"}_apostas.csv`;
+    link.download = `${bolao?.nome_do_bolao || "bolao"}_apostas_pagas.csv`;
     link.click();
     URL.revokeObjectURL(url);
 
     setExporting(false);
-    toast.success("CSV exportado com sucesso!");
+    toast.success(`${paidApostas.length} apostas pagas exportadas!`);
   };
 
   if (loading) {
