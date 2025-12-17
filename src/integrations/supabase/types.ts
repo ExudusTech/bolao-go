@@ -119,7 +119,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_bolao_for_participation: {
+        Args: { bolao_id: string }
+        Returns: {
+          chave_pix: string
+          created_at: string
+          gestor_name: string
+          id: string
+          nome_do_bolao: string
+          observacoes: string
+          total_apostas: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
