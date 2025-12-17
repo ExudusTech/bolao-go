@@ -69,6 +69,7 @@ export type Database = {
           id: string
           nome_do_bolao: string
           observacoes: string | null
+          tipo_loteria: string
           total_apostas: number
           updated_at: string
           valor_cota: number
@@ -80,6 +81,7 @@ export type Database = {
           id?: string
           nome_do_bolao: string
           observacoes?: string | null
+          tipo_loteria?: string
           total_apostas?: number
           updated_at?: string
           valor_cota?: number
@@ -91,6 +93,7 @@ export type Database = {
           id?: string
           nome_do_bolao?: string
           observacoes?: string | null
+          tipo_loteria?: string
           total_apostas?: number
           updated_at?: string
           valor_cota?: number
