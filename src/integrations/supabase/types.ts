@@ -22,6 +22,10 @@ export type Database = {
           created_at: string
           dezenas: number[]
           id: string
+          paid_at: string | null
+          paid_marked_by: string | null
+          payment_status: string
+          receipt_url: string | null
         }
         Insert: {
           apelido: string
@@ -30,6 +34,10 @@ export type Database = {
           created_at?: string
           dezenas: number[]
           id?: string
+          paid_at?: string | null
+          paid_marked_by?: string | null
+          payment_status?: string
+          receipt_url?: string | null
         }
         Update: {
           apelido?: string
@@ -38,6 +46,10 @@ export type Database = {
           created_at?: string
           dezenas?: number[]
           id?: string
+          paid_at?: string | null
+          paid_marked_by?: string | null
+          payment_status?: string
+          receipt_url?: string | null
         }
         Relationships: [
           {

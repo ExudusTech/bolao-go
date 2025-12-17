@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { apostasSchema, ApostaInput } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Check, Share2 } from "lucide-react";
+import { Loader2, Check, Share2, Upload, FileImage } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BetFormProps {
@@ -19,6 +19,12 @@ interface BetFormProps {
   onSuccess: () => void;
 }
 
+interface SessionBet {
+  id: string;
+  numbers: number[];
+  receiptUploaded: boolean;
+}
+
 export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }: BetFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -26,7 +32,9 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
   const [honeypot, setHoneypot] = useState("");
   const [hasSubmittedBet, setHasSubmittedBet] = useState(false);
   const [participantInfo, setParticipantInfo] = useState<{ apelido: string; celular: string } | null>(null);
-  const [sessionBets, setSessionBets] = useState<number[][]>([]);
+  const [sessionBets, setSessionBets] = useState<SessionBet[]>([]);
+  const [uploadingBetId, setUploadingBetId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ApostaInput>({
     resolver: zodResolver(apostasSchema),
@@ -75,16 +83,16 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     const apelido = participantInfo?.apelido || data.apelido.trim();
     const celular = participantInfo?.celular || data.celular.trim();
     
-    const { error } = await supabase.from("apostas").insert({
+    const { data: insertedData, error } = await supabase.from("apostas").insert({
       bolao_id: bolaoId,
       apelido,
       celular,
       dezenas: selectedNumbers,
-    });
+    }).select("id").single();
 
     setIsLoading(false);
 
-    if (error) {
+    if (error || !insertedData) {
       toast.error("Erro ao registrar aposta. Tente novamente.");
       return;
     }
@@ -99,8 +107,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
       setParticipantInfo({ apelido, celular });
     }
     
-    // Track bet in session
-    setSessionBets(prev => [...prev, [...selectedNumbers]]);
+    // Track bet in session with ID
+    setSessionBets(prev => [...prev, { id: insertedData.id, numbers: [...selectedNumbers], receiptUploaded: false }]);
     
     setHasSubmittedBet(true);
     setSelectedNumbers([]);
@@ -112,10 +120,73 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     setHasSubmittedBet(false);
   };
 
+  const handleReceiptUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !uploadingBetId) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Por favor, envie apenas imagens");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Arquivo muito grande. Máximo 5MB");
+      return;
+    }
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uploadingBetId}-${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('receipts')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      toast.error("Erro ao enviar comprovante");
+      setUploadingBetId(null);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('receipts')
+      .getPublicUrl(fileName);
+
+    const { error: updateError } = await supabase
+      .from('apostas')
+      .update({ receipt_url: publicUrl })
+      .eq('id', uploadingBetId);
+
+    if (updateError) {
+      toast.error("Erro ao vincular comprovante");
+    } else {
+      toast.success("Comprovante enviado com sucesso!");
+      setSessionBets(prev => 
+        prev.map(bet => 
+          bet.id === uploadingBetId 
+            ? { ...bet, receiptUploaded: true } 
+            : bet
+        )
+      );
+    }
+
+    setUploadingBetId(null);
+    event.target.value = '';
+  };
+
   const numbers = Array.from({ length: 60 }, (_, i) => i + 1);
 
   return (
     <Card className={cn("w-full max-w-2xl", shakeForm && "animate-shake")}>
+      {/* Hidden file input for receipt upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleReceiptUpload}
+        className="hidden"
+      />
       <CardHeader className="text-center">
         <CardTitle className="text-2xl text-primary">{bolaoNome}</CardTitle>
         <CardDescription className="space-y-2">
@@ -146,19 +217,50 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
               <div className="space-y-2 max-h-40 overflow-y-auto">
                 {sessionBets.map((bet, index) => (
                   <div
-                    key={index}
-                    className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border"
+                    key={bet.id}
+                    className="flex items-center justify-between p-2 rounded-md bg-muted/50 border"
                   >
-                    <span className="text-xs text-muted-foreground w-6">#{index + 1}</span>
-                    <div className="flex flex-wrap gap-1">
-                      {bet.map((num) => (
-                        <span
-                          key={num}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-success text-success-foreground font-medium text-xs"
-                        >
-                          {num.toString().padStart(2, "0")}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground w-6">#{index + 1}</span>
+                      <div className="flex flex-wrap gap-1">
+                        {bet.numbers.map((num) => (
+                          <span
+                            key={num}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-success text-success-foreground font-medium text-xs"
+                          >
+                            {num.toString().padStart(2, "0")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {bet.receiptUploaded ? (
+                        <span className="flex items-center gap-1 text-xs text-success">
+                          <FileImage className="h-3 w-3" />
+                          Enviado
                         </span>
-                      ))}
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setUploadingBetId(bet.id);
+                            fileInputRef.current?.click();
+                          }}
+                          disabled={uploadingBetId === bet.id}
+                          className="h-6 text-xs px-2"
+                        >
+                          {uploadingBetId === bet.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <>
+                              <Upload className="h-3 w-3 mr-1" />
+                              Comprovante
+                            </>
+                          )}
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -177,7 +279,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
                 variant="outline"
                 onClick={() => {
                   const betsText = sessionBets
-                    .map((bet, i) => `#${i + 1}: ${bet.map(n => n.toString().padStart(2, "0")).join(", ")}`)
+                    .map((bet, i) => `#${i + 1}: ${bet.numbers.map(n => n.toString().padStart(2, "0")).join(", ")}`)
                     .join("\n");
                   const message = `🍀 *Minhas apostas no bolão "${bolaoNome}"*\n\nParticipante: ${participantInfo?.apelido}\nTotal de apostas: ${sessionBets.length}\n\n${betsText}\n\nBoa sorte! 🎯`;
                   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
