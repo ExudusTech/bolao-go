@@ -154,7 +154,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
                       {bet.map((num) => (
                         <span
                           key={num}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/80 text-primary-foreground font-medium text-xs"
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-success text-success-foreground font-medium text-xs"
                         >
                           {num.toString().padStart(2, "0")}
                         </span>
@@ -268,7 +268,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
                   selectedNumbers.map((num, idx) => (
                     <span
                       key={num}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-sm animate-scale-in"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-success text-success-foreground font-semibold text-sm animate-scale-in shadow-md"
                       style={{ animationDelay: `${idx * 50}ms` }}
                     >
                       {num.toString().padStart(2, "0")}
@@ -288,11 +288,11 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
                       onClick={() => handleNumberClick(num)}
                       disabled={isLoading}
                       className={cn(
-                        "flex h-8 w-full items-center justify-center rounded-md text-sm font-medium transition-all duration-150",
+                        "flex h-8 w-full items-center justify-center rounded-full text-sm font-medium transition-all duration-150",
                         "hover:scale-105 active:scale-95",
                         isSelected
-                          ? "bg-primary text-primary-foreground shadow-md"
-                          : "bg-muted hover:bg-muted/80 text-foreground"
+                          ? "bg-success text-success-foreground shadow-md ring-2 ring-success/30"
+                          : "bg-muted hover:bg-success/20 text-foreground"
                       )}
                     >
                       {num.toString().padStart(2, "0")}
