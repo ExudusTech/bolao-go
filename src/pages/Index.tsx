@@ -45,22 +45,21 @@ export default function Index() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent" />
+      {/* Hero Section - Caixa style gradient */}
+      <section className="relative overflow-hidden bg-caixa-gradient">
         <div className="container relative py-20 md:py-32">
           <div className="mx-auto max-w-3xl text-center animate-fade-in">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-              Organize seus bolões com{" "}
-              <span className="text-primary">facilidade</span>
+            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
+              Organize seus bolões da{" "}
+              <span className="text-accent">Mega-Sena</span>
             </h1>
-            <p className="mt-6 text-lg text-muted-foreground md:text-xl">
+            <p className="mt-6 text-lg text-white/90 md:text-xl">
               Crie bolões, gere links públicos e receba apostas de forma simples e organizada. 
               Sem complicação, sem burocracia.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
               {user ? (
-                <Button size="lg" asChild className="hover-scale text-base px-8">
+                <Button size="lg" asChild className="hover-scale text-base px-8 bg-accent text-accent-foreground hover:bg-accent/90">
                   <Link to="/gestor/dashboard">
                     Ir para o Dashboard
                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -68,13 +67,13 @@ export default function Index() {
                 </Button>
               ) : (
                 <>
-                  <Button size="lg" asChild className="hover-scale text-base px-8">
+                  <Button size="lg" asChild className="hover-scale text-base px-8 bg-accent text-accent-foreground hover:bg-accent/90">
                     <Link to="/auth?tab=register">
                       Começar Gratuitamente
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>
                   </Button>
-                  <Button size="lg" variant="outline" asChild className="hover-scale text-base">
+                  <Button size="lg" variant="outline" asChild className="hover-scale text-base border-white/30 text-white hover:bg-white/10 hover:text-white">
                     <Link to="/auth">
                       Já tenho conta
                     </Link>

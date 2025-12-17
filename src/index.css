@@ -4,99 +4,106 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* Robolão Design System - Green primary (#0B6E4F) + Yellow accent (#FFD166) */
+/* Robolão Design System - Inspired by Caixa Loterias */
+/* Primary: Blue (#005AA7) + Accent: Orange (#F7941D) */
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 0 0% 17%;
+    /* Background: Light gray-blue */
+    --background: 210 25% 97%;
+    --foreground: 210 50% 15%;
 
+    /* Card: White */
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 17%;
+    --card-foreground: 210 50% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 17%;
+    --popover-foreground: 210 50% 15%;
 
-    /* Primary: #0B6E4F - Green */
-    --primary: 158 82% 24%;
+    /* Primary: Caixa Blue #005AA7 */
+    --primary: 207 100% 33%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Light green tint */
-    --secondary: 158 30% 95%;
-    --secondary-foreground: 158 82% 24%;
+    /* Secondary: Light blue tint */
+    --secondary: 207 40% 95%;
+    --secondary-foreground: 207 100% 33%;
 
     /* Muted */
-    --muted: 210 20% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted: 210 25% 94%;
+    --muted-foreground: 210 20% 45%;
 
-    /* Accent: #FFD166 - Yellow */
-    --accent: 43 100% 70%;
-    --accent-foreground: 0 0% 17%;
+    /* Accent: Caixa Orange #F7941D */
+    --accent: 33 93% 54%;
+    --accent-foreground: 0 0% 100%;
 
-    /* Success: #28A745 */
-    --success: 134 61% 41%;
+    /* Success: Mega-Sena Green #209869 */
+    --success: 158 66% 36%;
     --success-foreground: 0 0% 100%;
 
-    /* Destructive: #E63946 */
+    /* Destructive: Red */
     --destructive: 355 79% 56%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 20% 90%;
-    --input: 210 20% 90%;
-    --ring: 158 82% 24%;
+    --border: 210 25% 88%;
+    --input: 210 25% 88%;
+    --ring: 207 100% 33%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 17%;
-    --sidebar-primary: 158 82% 24%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 158 30% 95%;
-    --sidebar-accent-foreground: 158 82% 24%;
-    --sidebar-border: 210 20% 90%;
-    --sidebar-ring: 158 82% 24%;
+    --sidebar-background: 207 100% 33%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 207 100% 33%;
+    --sidebar-accent: 207 80% 40%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 207 80% 45%;
+    --sidebar-ring: 0 0% 100%;
   }
 
   .dark {
-    --background: 0 0% 9%;
-    --foreground: 210 20% 98%;
+    /* Dark mode: Deep blue background */
+    --background: 210 50% 8%;
+    --foreground: 210 20% 95%;
 
-    --card: 0 0% 12%;
-    --card-foreground: 210 20% 98%;
+    --card: 210 45% 12%;
+    --card-foreground: 210 20% 95%;
 
-    --popover: 0 0% 12%;
-    --popover-foreground: 210 20% 98%;
+    --popover: 210 45% 12%;
+    --popover-foreground: 210 20% 95%;
 
-    --primary: 158 72% 35%;
+    /* Primary: Lighter blue for dark mode */
+    --primary: 207 90% 50%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 158 30% 15%;
-    --secondary-foreground: 158 72% 60%;
+    /* Secondary */
+    --secondary: 207 40% 18%;
+    --secondary-foreground: 207 90% 70%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
+    --muted: 210 40% 15%;
+    --muted-foreground: 210 20% 60%;
 
-    --accent: 43 100% 60%;
-    --accent-foreground: 0 0% 9%;
+    /* Accent: Bright orange */
+    --accent: 33 100% 55%;
+    --accent-foreground: 0 0% 10%;
 
-    --success: 134 61% 35%;
+    --success: 158 60% 40%;
     --success-foreground: 0 0% 100%;
 
-    --destructive: 355 70% 45%;
+    --destructive: 355 70% 50%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 158 72% 35%;
+    --border: 210 40% 20%;
+    --input: 210 40% 20%;
+    --ring: 207 90% 50%;
 
-    --sidebar-background: 0 0% 12%;
-    --sidebar-foreground: 210 20% 98%;
-    --sidebar-primary: 158 72% 35%;
+    --sidebar-background: 210 50% 10%;
+    --sidebar-foreground: 210 20% 95%;
+    --sidebar-primary: 207 90% 50%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 158 30% 15%;
-    --sidebar-accent-foreground: 158 72% 60%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 158 72% 35%;
+    --sidebar-accent: 210 40% 18%;
+    --sidebar-accent-foreground: 207 90% 70%;
+    --sidebar-border: 210 40% 20%;
+    --sidebar-ring: 207 90% 50%;
   }
 }
 
@@ -108,6 +115,21 @@
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+/* Caixa-style gradient backgrounds */
+@layer utilities {
+  .bg-caixa-gradient {
+    background: linear-gradient(135deg, hsl(207 100% 33%) 0%, hsl(185 70% 40%) 100%);
+  }
+
+  .bg-caixa-gradient-dark {
+    background: linear-gradient(135deg, hsl(207 100% 25%) 0%, hsl(185 60% 30%) 100%);
+  }
+
+  .bg-megasena {
+    background: linear-gradient(135deg, hsl(158 66% 36%) 0%, hsl(158 66% 28%) 100%);
   }
 }
 
@@ -140,7 +162,7 @@
   }
 
   @keyframes highlight-flash {
-    0% { background-color: hsl(158 30% 90%); }
+    0% { background-color: hsl(207 40% 90%); }
     100% { background-color: transparent; }
   }
 
