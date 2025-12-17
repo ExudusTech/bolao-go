@@ -23,6 +23,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [shakeForm, setShakeForm] = useState(false);
+  const [honeypot, setHoneypot] = useState("");
 
   const form = useForm<ApostaInput>({
     resolver: zodResolver(apostasSchema),
@@ -47,6 +48,15 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
   };
 
   const handleSubmit = async (data: Omit<ApostaInput, "dezenas">) => {
+    // Bot detection: honeypot field should be empty
+    if (honeypot) {
+      // Silently reject bot submissions
+      toast.success("Aposta registrada com sucesso!");
+      form.reset();
+      setSelectedNumbers([]);
+      return;
+    }
+
     if (selectedNumbers.length !== 6) {
       setShakeForm(true);
       setTimeout(() => setShakeForm(false), 320);
@@ -124,6 +134,25 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
               )}
             </div>
           </div>
+
+          {/* Honeypot field - hidden from humans, bots will fill this */}
+          <input
+            type="text"
+            name="website"
+            value={honeypot}
+            onChange={(e) => setHoneypot(e.target.value)}
+            style={{
+              position: 'absolute',
+              left: '-9999px',
+              opacity: 0,
+              height: 0,
+              width: 0,
+              pointerEvents: 'none',
+            }}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+          />
 
           {/* Number Selection */}
           <div className="space-y-3">
