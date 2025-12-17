@@ -39,14 +39,18 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
 
   const handleNumberClick = (num: number) => {
     setSelectedNumbers((prev) => {
+      let newNumbers: number[];
       if (prev.includes(num)) {
-        return prev.filter((n) => n !== num);
-      }
-      if (prev.length >= 6) {
+        newNumbers = prev.filter((n) => n !== num);
+      } else if (prev.length >= 6) {
         toast.error("Você já selecionou 6 números");
         return prev;
+      } else {
+        newNumbers = [...prev, num].sort((a, b) => a - b);
       }
-      return [...prev, num].sort((a, b) => a - b);
+      // Update form field for validation
+      form.setValue("dezenas", newNumbers);
+      return newNumbers;
     });
   };
 
