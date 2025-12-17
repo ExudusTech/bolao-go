@@ -24,6 +24,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [shakeForm, setShakeForm] = useState(false);
   const [honeypot, setHoneypot] = useState("");
+  const [hasSubmittedBet, setHasSubmittedBet] = useState(false);
+  const [participantInfo, setParticipantInfo] = useState<{ apelido: string; celular: string } | null>(null);
 
   const form = useForm<ApostaInput>({
     resolver: zodResolver(apostasSchema),
@@ -52,7 +54,6 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     if (honeypot) {
       // Silently reject bot submissions
       toast.success("Aposta registrada com sucesso!");
-      form.reset();
       setSelectedNumbers([]);
       return;
     }
@@ -66,10 +67,13 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
 
     setIsLoading(true);
     
+    const apelido = participantInfo?.apelido || data.apelido.trim();
+    const celular = participantInfo?.celular || data.celular.trim();
+    
     const { error } = await supabase.from("apostas").insert({
       bolao_id: bolaoId,
-      apelido: data.apelido.trim(),
-      celular: data.celular.trim(),
+      apelido,
+      celular,
       dezenas: selectedNumbers,
     });
 
@@ -85,9 +89,19 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
       icon: <Check className="h-5 w-5 text-success" />,
     });
     
-    form.reset();
+    // Save participant info for future bets
+    if (!participantInfo) {
+      setParticipantInfo({ apelido, celular });
+    }
+    
+    setHasSubmittedBet(true);
     setSelectedNumbers([]);
     onSuccess();
+  };
+
+  const handleNewBet = () => {
+    setSelectedNumbers([]);
+    setHasSubmittedBet(false);
   };
 
   const numbers = Array.from({ length: 60 }, (_, i) => i + 1);
@@ -102,127 +116,158 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-          {/* Personal Info */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="apelido">Apelido *</Label>
-              <Input
-                id="apelido"
-                placeholder="Como você quer ser chamado"
-                {...form.register("apelido")}
-                disabled={isLoading}
-              />
-              {form.formState.errors.apelido && (
-                <p className="text-sm text-destructive animate-fade-in">
-                  {form.formState.errors.apelido.message}
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="celular">Celular *</Label>
-              <Input
-                id="celular"
-                placeholder="(00) 00000-0000"
-                {...form.register("celular")}
-                disabled={isLoading}
-              />
-              {form.formState.errors.celular && (
-                <p className="text-sm text-destructive animate-fade-in">
-                  {form.formState.errors.celular.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Honeypot field - hidden from humans, bots will fill this */}
-          <input
-            type="text"
-            name="website"
-            value={honeypot}
-            onChange={(e) => setHoneypot(e.target.value)}
-            style={{
-              position: 'absolute',
-              left: '-9999px',
-              opacity: 0,
-              height: 0,
-              width: 0,
-              pointerEvents: 'none',
-            }}
-            tabIndex={-1}
-            autoComplete="off"
-            aria-hidden="true"
-          />
-
-          {/* Number Selection */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Escolha 6 números *</Label>
-              <span className="text-sm text-muted-foreground">
-                {selectedNumbers.length}/6 selecionados
-              </span>
+        {hasSubmittedBet && participantInfo ? (
+          // Success state - show option to register new bet
+          <div className="space-y-6 text-center">
+            <div className="p-6 rounded-lg bg-primary/10 border border-primary/20">
+              <Check className="h-12 w-12 text-primary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                Aposta registrada com sucesso!
+              </h3>
+              <p className="text-muted-foreground">
+                Olá, <span className="font-medium text-foreground">{participantInfo.apelido}</span>! 
+                Sua aposta foi confirmada.
+              </p>
             </div>
             
-            {/* Selected Numbers Display */}
-            <div className="flex flex-wrap gap-2 min-h-[40px] p-3 rounded-lg bg-secondary/50 border">
-              {selectedNumbers.length === 0 ? (
-                <span className="text-sm text-muted-foreground">Clique nos números abaixo para selecionar</span>
-              ) : (
-                selectedNumbers.map((num, idx) => (
-                  <span
-                    key={num}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-sm animate-scale-in"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    {num.toString().padStart(2, "0")}
-                  </span>
-                ))
-              )}
-            </div>
-
-            {/* Number Grid */}
-            <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
-              {numbers.map((num) => {
-                const isSelected = selectedNumbers.includes(num);
-                return (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => handleNumberClick(num)}
-                    disabled={isLoading}
-                    className={cn(
-                      "flex h-8 w-full items-center justify-center rounded-md text-sm font-medium transition-all duration-150",
-                      "hover:scale-105 active:scale-95",
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-md"
-                        : "bg-muted hover:bg-muted/80 text-foreground"
-                    )}
-                  >
-                    {num.toString().padStart(2, "0")}
-                  </button>
-                );
-              })}
-            </div>
+            <Button
+              onClick={handleNewBet}
+              className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              Registrar nova aposta
+            </Button>
           </div>
-
-          {/* Legal Notice */}
-          <p className="text-xs text-muted-foreground text-center px-4">
-            As informações fornecidas (apelido, telefone e dezenas) serão usadas exclusivamente para organização do bolão.
-          </p>
-
-          {/* Submit */}
-          <Button
-            type="submit"
-            className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
-            disabled={isLoading || selectedNumbers.length !== 6}
-          >
-            {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            {/* Personal Info - only show if no participantInfo */}
+            {!participantInfo ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="apelido">Apelido *</Label>
+                  <Input
+                    id="apelido"
+                    placeholder="Como você quer ser chamado"
+                    {...form.register("apelido")}
+                    disabled={isLoading}
+                  />
+                  {form.formState.errors.apelido && (
+                    <p className="text-sm text-destructive animate-fade-in">
+                      {form.formState.errors.apelido.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="celular">Celular *</Label>
+                  <Input
+                    id="celular"
+                    placeholder="(00) 00000-0000"
+                    {...form.register("celular")}
+                    disabled={isLoading}
+                  />
+                  {form.formState.errors.celular && (
+                    <p className="text-sm text-destructive animate-fade-in">
+                      {form.formState.errors.celular.message}
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : (
-              "Enviar minha aposta"
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <p className="text-sm text-muted-foreground">
+                  Apostando como: <span className="font-medium text-foreground">{participantInfo.apelido}</span>
+                </p>
+              </div>
             )}
-          </Button>
-        </form>
+
+            {/* Honeypot field - hidden from humans, bots will fill this */}
+            <input
+              type="text"
+              name="website"
+              value={honeypot}
+              onChange={(e) => setHoneypot(e.target.value)}
+              style={{
+                position: 'absolute',
+                left: '-9999px',
+                opacity: 0,
+                height: 0,
+                width: 0,
+                pointerEvents: 'none',
+              }}
+              tabIndex={-1}
+              autoComplete="off"
+              aria-hidden="true"
+            />
+
+            {/* Number Selection */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Escolha 6 números *</Label>
+                <span className="text-sm text-muted-foreground">
+                  {selectedNumbers.length}/6 selecionados
+                </span>
+              </div>
+              
+              {/* Selected Numbers Display */}
+              <div className="flex flex-wrap gap-2 min-h-[40px] p-3 rounded-lg bg-secondary/50 border">
+                {selectedNumbers.length === 0 ? (
+                  <span className="text-sm text-muted-foreground">Clique nos números abaixo para selecionar</span>
+                ) : (
+                  selectedNumbers.map((num, idx) => (
+                    <span
+                      key={num}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-sm animate-scale-in"
+                      style={{ animationDelay: `${idx * 50}ms` }}
+                    >
+                      {num.toString().padStart(2, "0")}
+                    </span>
+                  ))
+                )}
+              </div>
+
+              {/* Number Grid */}
+              <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
+                {numbers.map((num) => {
+                  const isSelected = selectedNumbers.includes(num);
+                  return (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => handleNumberClick(num)}
+                      disabled={isLoading}
+                      className={cn(
+                        "flex h-8 w-full items-center justify-center rounded-md text-sm font-medium transition-all duration-150",
+                        "hover:scale-105 active:scale-95",
+                        isSelected
+                          ? "bg-primary text-primary-foreground shadow-md"
+                          : "bg-muted hover:bg-muted/80 text-foreground"
+                      )}
+                    >
+                      {num.toString().padStart(2, "0")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Legal Notice */}
+            <p className="text-xs text-muted-foreground text-center px-4">
+              As informações fornecidas (apelido, telefone e dezenas) serão usadas exclusivamente para organização do bolão.
+            </p>
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
+              disabled={isLoading || selectedNumbers.length !== 6}
+            >
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                "Enviar minha aposta"
+              )}
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
   );
