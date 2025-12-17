@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { apostasSchema, ApostaInput } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Check } from "lucide-react";
+import { Loader2, Check, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BetFormProps {
@@ -161,12 +161,30 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
               </div>
             </div>
             
-            <Button
-              onClick={handleNewBet}
-              className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
-            >
-              Registrar nova aposta
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={handleNewBet}
+                className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
+              >
+                Registrar nova aposta
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const betsText = sessionBets
+                    .map((bet, i) => `#${i + 1}: ${bet.map(n => n.toString().padStart(2, "0")).join(", ")}`)
+                    .join("\n");
+                  const message = `🍀 *Minhas apostas no bolão "${bolaoNome}"*\n\nParticipante: ${participantInfo?.apelido}\nTotal de apostas: ${sessionBets.length}\n\n${betsText}\n\nBoa sorte! 🎯`;
+                  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                  window.open(whatsappUrl, "_blank");
+                }}
+                className="w-full h-10 gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                Compartilhar via WhatsApp
+              </Button>
+            </div>
           </div>
         ) : (
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
