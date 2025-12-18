@@ -188,7 +188,7 @@ export default function BolaoDetalhes() {
     }
   };
 
-  const handleRequestMoreSuggestions = async (excludeIds: string[], alreadySelectedCost: number): Promise<SuggestedGame[]> => {
+  const handleRequestMoreSuggestions = async (excludeIds: string[], alreadySelectedCost: number, existingGameNumbers: number[][]): Promise<SuggestedGame[]> => {
     const apostasParaIA = paidApostas.map(a => ({
       apelido: a.apelido,
       dezenas: a.dezenas.sort((x, y) => x - y),
@@ -212,6 +212,7 @@ export default function BolaoDetalhes() {
           apostas: apostasParaIA,
           excludeIds,
           alreadySelectedCost,
+          existingGameNumbers,
         }),
       });
 
@@ -243,7 +244,8 @@ export default function BolaoDetalhes() {
     excludeIds: string[], 
     alreadySelectedCost: number, 
     size: number, 
-    criteria: GameCriteria
+    criteria: GameCriteria,
+    existingGameNumbers: number[][]
   ): Promise<SuggestedGame | null> => {
     const apostasParaIA = paidApostas.map(a => ({
       apelido: a.apelido,
@@ -266,6 +268,7 @@ export default function BolaoDetalhes() {
           apostas: apostasParaIA,
           excludeIds,
           alreadySelectedCost,
+          existingGameNumbers,
           customRequest: { size, criteria },
         }),
       });
@@ -283,6 +286,10 @@ export default function BolaoDetalhes() {
       }
 
       const data = await response.json();
+      if (data.error) {
+        toast.error(data.error);
+        return null;
+      }
       return data.customGame || null;
     } catch (error) {
       console.error("Error getting custom suggestion:", error);
