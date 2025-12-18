@@ -108,6 +108,44 @@ export type Database = {
           },
         ]
       }
+      jogos_selecionados: {
+        Row: {
+          bolao_id: string
+          categoria: string
+          created_at: string
+          custo: number
+          dezenas: number[]
+          id: string
+          tipo: string
+        }
+        Insert: {
+          bolao_id: string
+          categoria: string
+          created_at?: string
+          custo: number
+          dezenas: number[]
+          id?: string
+          tipo: string
+        }
+        Update: {
+          bolao_id?: string
+          categoria?: string
+          created_at?: string
+          custo?: number
+          dezenas?: number[]
+          id?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jogos_selecionados_bolao_id_fkey"
+            columns: ["bolao_id"]
+            isOneToOne: false
+            referencedRelation: "boloes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

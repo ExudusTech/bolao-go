@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, DollarSign, Check, RefreshCw, Loader2 } from "lucide-react";
+import { Sparkles, DollarSign, Check, RefreshCw, Loader2, Save, FileText, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 export interface SuggestedGame {
   id: string;
@@ -26,8 +27,11 @@ interface GameSuggestionsProps {
   analysis: NumberAnalysis;
   onSelectionChange?: (selectedGames: SuggestedGame[], remainingBudget: number) => void;
   onRequestMoreSuggestions?: (excludeIds: string[], alreadySelectedCost: number) => Promise<SuggestedGame[]>;
+  onSaveGames?: (games: SuggestedGame[]) => Promise<boolean>;
   isLoadingMore?: boolean;
+  isSaving?: boolean;
   minGameCost?: number;
+  lotteryName?: string;
 }
 
 export function GameSuggestions({
@@ -37,13 +41,16 @@ export function GameSuggestions({
   analysis,
   onSelectionChange,
   onRequestMoreSuggestions,
+  onSaveGames,
   isLoadingMore = false,
+  isSaving = false,
   minGameCost = 4.50,
+  lotteryName = "Mega-Sena",
 }: GameSuggestionsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [allSuggestions, setAllSuggestions] = useState<SuggestedGame[]>(initialSuggestions);
+  const [showSummary, setShowSummary] = useState(false);
 
-  // Update suggestions when prop changes
   useMemo(() => {
     const existingIds = new Set(allSuggestions.map(s => s.id));
     const newSuggestions = initialSuggestions.filter(s => !existingIds.has(s.id));
@@ -95,9 +102,117 @@ export function GameSuggestions({
     }
   };
 
+  const handleSave = async () => {
+    if (!onSaveGames || selectedGames.length === 0) return;
+    const success = await onSaveGames(selectedGames);
+    if (success) {
+      setShowSummary(true);
+    }
+  };
+
+  const handleCopySummary = () => {
+    const summary = generateSummaryText();
+    navigator.clipboard.writeText(summary);
+    toast.success("Resumo copiado para a área de transferência!");
+  };
+
+  const generateSummaryText = () => {
+    const lines = [
+      `📋 RESUMO PARA REGISTRO NA LOTÉRICA`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `Loteria: ${lotteryName}`,
+      `Total de Jogos: ${selectedGames.length}`,
+      `Valor Total: R$ ${selectedCost.toFixed(2)}`,
+      ``,
+      `JOGOS SELECIONADOS:`,
+      ``,
+    ];
+
+    selectedGames.forEach((game, index) => {
+      const nums = game.numbers.map(n => n.toString().padStart(2, "0")).join(" - ");
+      lines.push(`Jogo ${index + 1} (${game.type}): ${nums}`);
+      lines.push(`   Valor: R$ ${game.cost.toFixed(2)}`);
+      lines.push(``);
+    });
+
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`Gerado por Robolão`);
+
+    return lines.join("\n");
+  };
+
   const canRequestMore = remainingBudget >= minGameCost && onRequestMoreSuggestions;
   const unselectedSuggestions = allSuggestions.filter(s => !selectedIds.has(s.id));
   const hasAffordableUnselected = unselectedSuggestions.some(s => s.cost <= remainingBudget);
+
+  if (showSummary) {
+    return (
+      <Card className="animate-fade-in border-success/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-success">
+            <FileText className="h-5 w-5" />
+            Resumo para Registro na Lotérica
+          </CardTitle>
+          <CardDescription>
+            Jogos salvos com sucesso! Use este resumo para registrar na lotérica.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Summary Header */}
+          <div className="grid grid-cols-3 gap-4">
+            <div className="p-3 rounded-lg bg-muted/50 border text-center">
+              <p className="text-xs text-muted-foreground">Loteria</p>
+              <p className="text-lg font-bold">{lotteryName}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50 border text-center">
+              <p className="text-xs text-muted-foreground">Total de Jogos</p>
+              <p className="text-lg font-bold">{selectedGames.length}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-success/10 border border-success/30 text-center">
+              <p className="text-xs text-muted-foreground">Valor Total</p>
+              <p className="text-lg font-bold text-success">R$ {selectedCost.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Games List */}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium">Jogos para Registro</h4>
+            <div className="space-y-2">
+              {selectedGames.map((game, index) => (
+                <div key={game.id} className="p-4 rounded-lg bg-muted/30 border">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge variant="default">Jogo {index + 1} - {game.type}</Badge>
+                    <span className="text-sm font-medium">R$ {game.cost.toFixed(2)}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {game.numbers.map((num) => (
+                      <span
+                        key={num}
+                        className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground text-sm font-bold"
+                      >
+                        {num.toString().padStart(2, "0")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={handleCopySummary} className="flex-1">
+              <Copy className="h-4 w-4 mr-2" />
+              Copiar Resumo
+            </Button>
+            <Button variant="outline" onClick={() => setShowSummary(false)} className="flex-1">
+              Voltar às Sugestões
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="animate-fade-in border-accent/50">
@@ -273,9 +388,9 @@ export function GameSuggestions({
           </div>
         )}
 
-        {/* Summary */}
+        {/* Summary and Save */}
         {selectedIds.size > 0 && (
-          <div className="p-4 rounded-lg bg-accent/10 border border-accent/30">
+          <div className="p-4 rounded-lg bg-accent/10 border border-accent/30 space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium">{selectedIds.size} jogo(s) selecionado(s)</p>
@@ -287,11 +402,31 @@ export function GameSuggestions({
                 Saldo: R$ {remainingBudget.toFixed(2)}
               </Badge>
             </div>
+            
+            {onSaveGames && (
+              <Button 
+                onClick={handleSave} 
+                disabled={isSaving}
+                className="w-full bg-success hover:bg-success/90 text-success-foreground"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Salvar Jogos e Gerar Resumo
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
 
         {/* Budget Exhausted Message */}
-        {remainingBudget < minGameCost && selectedIds.size > 0 && (
+        {remainingBudget < minGameCost && selectedIds.size > 0 && !onSaveGames && (
           <div className="p-4 rounded-lg bg-success/10 border border-success/30 text-center">
             <Check className="h-6 w-6 text-success mx-auto mb-2" />
             <p className="font-medium text-success">Orçamento totalmente utilizado!</p>
