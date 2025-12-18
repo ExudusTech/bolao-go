@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +62,8 @@ export function GameSuggestions({
   const [customCriteria, setCustomCriteria] = useState<GameCriteria | "">("");
   const [isLoadingCustom, setIsLoadingCustom] = useState(false);
 
-  useMemo(() => {
+  // Sync new suggestions from props (for "more suggestions" feature)
+  useEffect(() => {
     const existingIds = new Set(allSuggestions.map(s => s.id));
     const newSuggestions = initialSuggestions.filter(s => !existingIds.has(s.id));
     if (newSuggestions.length > 0) {

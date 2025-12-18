@@ -67,7 +67,13 @@ function generateGameSuggestions(
 ): SuggestedGame[] {
   const suggestions: SuggestedGame[] = [];
   let remainingBudget = availableBudget;
-  let gameIndex = 1;
+  
+  // Start gameIndex after the highest excluded ID to avoid conflicts
+  const excludedNumbers = excludeIds
+    .filter(id => id.startsWith('suggestion-'))
+    .map(id => parseInt(id.replace('suggestion-', ''), 10))
+    .filter(n => !isNaN(n));
+  let gameIndex = excludedNumbers.length > 0 ? Math.max(...excludedNumbers) + 1 : 1;
   
   const targetSizes = [10, 9, 8, 7];
   const excludeSet = new Set(excludeIds);
