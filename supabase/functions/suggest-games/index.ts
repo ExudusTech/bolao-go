@@ -70,117 +70,126 @@ function generateGameSuggestions(
   
   const targetSizes = [10, 9, 8, 7];
   
+  // Category 1: Games with MOST VOTED numbers
   for (const size of targetSizes) {
+    if (suggestions.filter(s => s.reason.includes('mais votados')).length >= 3) break;
     const price = lotteryConfig.prices[size];
     if (!price || price > remainingBudget) continue;
     
-    const numbers = generateNumberCombination(size, analysis, existingNumbers);
-    if (!numbers) continue;
-    
+    const numbers = generateFromMostVoted(size, analysis, lotteryConfig.numberRange);
     const gameKey = numbers.sort((a, b) => a - b).join(',');
     if (existingNumbers.has(gameKey)) continue;
     
     existingNumbers.add(gameKey);
-    
     suggestions.push({
       id: `suggestion-${gameIndex}`,
       numbers: numbers.sort((a, b) => a - b),
       cost: price,
       type: `${size} dezenas`,
-      reason: getReasonForGame(size, numbers, analysis),
+      reason: `Jogo com os ${size} números MAIS VOTADOS pelos participantes`,
     });
     
     remainingBudget -= price;
     gameIndex++;
-    
-    if (suggestions.length >= 8) break;
   }
   
-  while (remainingBudget >= lotteryConfig.prices[7] && suggestions.length < 12) {
-    let added = false;
-    for (const size of [7, 8, 9, 10]) {
+  // Category 2: Games with LEAST VOTED numbers
+  for (const size of targetSizes) {
+    if (suggestions.filter(s => s.reason.includes('menos votados')).length >= 3) break;
+    const price = lotteryConfig.prices[size];
+    if (!price || price > remainingBudget) continue;
+    
+    const numbers = generateFromLeastVoted(size, analysis, lotteryConfig.numberRange);
+    const gameKey = numbers.sort((a, b) => a - b).join(',');
+    if (existingNumbers.has(gameKey)) continue;
+    
+    existingNumbers.add(gameKey);
+    suggestions.push({
+      id: `suggestion-${gameIndex}`,
+      numbers: numbers.sort((a, b) => a - b),
+      cost: price,
+      type: `${size} dezenas`,
+      reason: `Jogo com os ${size} números MENOS VOTADOS pelos participantes`,
+    });
+    
+    remainingBudget -= price;
+    gameIndex++;
+  }
+  
+  // Category 3: Games with NOT VOTED numbers
+  if (analysis.notVoted.length >= 6) {
+    for (const size of targetSizes) {
+      if (suggestions.filter(s => s.reason.includes('NÃO VOTADOS')).length >= 3) break;
       const price = lotteryConfig.prices[size];
       if (!price || price > remainingBudget) continue;
+      if (analysis.notVoted.length < size) continue;
       
-      const numbers = generateNumberCombination(size, analysis, existingNumbers);
+      const numbers = generateFromNotVoted(size, analysis);
       if (!numbers) continue;
       
       const gameKey = numbers.sort((a, b) => a - b).join(',');
       if (existingNumbers.has(gameKey)) continue;
       
       existingNumbers.add(gameKey);
-      
       suggestions.push({
         id: `suggestion-${gameIndex}`,
         numbers: numbers.sort((a, b) => a - b),
         cost: price,
         type: `${size} dezenas`,
-        reason: getReasonForGame(size, numbers, analysis),
+        reason: `Jogo com ${size} números NÃO VOTADOS por nenhum participante`,
       });
       
       remainingBudget -= price;
       gameIndex++;
-      added = true;
-      break;
     }
-    
-    if (!added || suggestions.length >= 12) break;
   }
   
   return suggestions;
 }
 
-function generateNumberCombination(
-  size: number,
-  analysis: NumberAnalysis,
-  existingGames: Set<string>
-): number[] | null {
+function generateFromMostVoted(size: number, analysis: NumberAnalysis, numberRange: number): number[] {
   const numbers: Set<number> = new Set();
   
-  const mostVotedCount = Math.ceil(size * 0.4);
-  const shuffledMostVoted = [...analysis.mostVoted].sort(() => Math.random() - 0.5);
-  for (let i = 0; i < mostVotedCount && numbers.size < size; i++) {
-    if (shuffledMostVoted[i]) {
-      numbers.add(shuffledMostVoted[i].number);
-    }
+  // Prioritize most voted numbers
+  const sortedMostVoted = [...analysis.mostVoted].sort((a, b) => b.count - a.count);
+  for (const item of sortedMostVoted) {
+    if (numbers.size >= size) break;
+    numbers.add(item.number);
   }
   
-  const notVotedCount = Math.ceil(size * 0.3);
-  const shuffledNotVoted = [...analysis.notVoted].sort(() => Math.random() - 0.5);
-  for (let i = 0; i < notVotedCount && numbers.size < size; i++) {
-    if (shuffledNotVoted[i]) {
-      numbers.add(shuffledNotVoted[i]);
-    }
-  }
-  
-  const shuffledLeastVoted = [...analysis.leastVoted].sort(() => Math.random() - 0.5);
-  for (let i = 0; numbers.size < size && i < shuffledLeastVoted.length; i++) {
-    numbers.add(shuffledLeastVoted[i].number);
-  }
-  
+  // Fill remaining with random numbers if needed
   while (numbers.size < size) {
-    const randomNum = Math.floor(Math.random() * 60) + 1;
+    const randomNum = Math.floor(Math.random() * numberRange) + 1;
     numbers.add(randomNum);
   }
   
   return Array.from(numbers);
 }
 
-function getReasonForGame(size: number, numbers: number[], analysis: NumberAnalysis): string {
-  const hotNumbers = numbers.filter(n => 
-    analysis.mostVoted.some(m => m.number === n)
-  ).length;
-  const coldNumbers = numbers.filter(n => 
-    analysis.notVoted.includes(n)
-  ).length;
+function generateFromLeastVoted(size: number, analysis: NumberAnalysis, numberRange: number): number[] {
+  const numbers: Set<number> = new Set();
   
-  if (hotNumbers >= size * 0.5) {
-    return `Jogo com ${hotNumbers} números quentes (mais votados pelos participantes)`;
-  } else if (coldNumbers >= size * 0.3) {
-    return `Jogo diversificado com ${coldNumbers} números frios para aumentar cobertura`;
-  } else {
-    return `Combinação balanceada entre números populares e oportunidades`;
+  // Prioritize least voted numbers (that were voted at least once)
+  const sortedLeastVoted = [...analysis.leastVoted].sort((a, b) => a.count - b.count);
+  for (const item of sortedLeastVoted) {
+    if (numbers.size >= size) break;
+    numbers.add(item.number);
   }
+  
+  // Fill remaining with random numbers if needed
+  while (numbers.size < size) {
+    const randomNum = Math.floor(Math.random() * numberRange) + 1;
+    numbers.add(randomNum);
+  }
+  
+  return Array.from(numbers);
+}
+
+function generateFromNotVoted(size: number, analysis: NumberAnalysis): number[] | null {
+  if (analysis.notVoted.length < size) return null;
+  
+  const shuffled = [...analysis.notVoted].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, size);
 }
 
 serve(async (req) => {
