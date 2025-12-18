@@ -18,15 +18,27 @@ interface Aposta {
   dezenas: number[];
 }
 
-function analyzeNumbers(apostas: Aposta[], numberRange: number) {
+interface SuggestedGame {
+  id: string;
+  numbers: number[];
+  cost: number;
+  type: string;
+  reason: string;
+}
+
+interface NumberAnalysis {
+  mostVoted: Array<{ number: number; count: number }>;
+  leastVoted: Array<{ number: number; count: number }>;
+  notVoted: number[];
+}
+
+function analyzeNumbers(apostas: Aposta[], numberRange: number): NumberAnalysis {
   const frequency: Record<number, number> = {};
   
-  // Initialize all numbers with 0
   for (let i = 1; i <= numberRange; i++) {
     frequency[i] = 0;
   }
   
-  // Count frequency
   apostas.forEach(a => {
     a.dezenas.forEach(n => {
       frequency[n] = (frequency[n] || 0) + 1;
@@ -43,7 +55,132 @@ function analyzeNumbers(apostas: Aposta[], numberRange: number) {
   const leastVoted = sorted.filter(e => e.count > 0).reverse().slice(0, 10);
   const notVoted = entries.filter(e => e.count === 0).map(e => e.number);
   
-  return { frequency, mostVoted, leastVoted, notVoted };
+  return { mostVoted, leastVoted, notVoted };
+}
+
+function generateGameSuggestions(
+  availableBudget: number,
+  analysis: NumberAnalysis,
+  lotteryConfig: LotteryConfig,
+  existingNumbers: Set<string>
+): SuggestedGame[] {
+  const suggestions: SuggestedGame[] = [];
+  let remainingBudget = availableBudget;
+  let gameIndex = 1;
+  
+  const targetSizes = [10, 9, 8, 7];
+  
+  for (const size of targetSizes) {
+    const price = lotteryConfig.prices[size];
+    if (!price || price > remainingBudget) continue;
+    
+    const numbers = generateNumberCombination(size, analysis, existingNumbers);
+    if (!numbers) continue;
+    
+    const gameKey = numbers.sort((a, b) => a - b).join(',');
+    if (existingNumbers.has(gameKey)) continue;
+    
+    existingNumbers.add(gameKey);
+    
+    suggestions.push({
+      id: `suggestion-${gameIndex}`,
+      numbers: numbers.sort((a, b) => a - b),
+      cost: price,
+      type: `${size} dezenas`,
+      reason: getReasonForGame(size, numbers, analysis),
+    });
+    
+    remainingBudget -= price;
+    gameIndex++;
+    
+    if (suggestions.length >= 8) break;
+  }
+  
+  while (remainingBudget >= lotteryConfig.prices[7] && suggestions.length < 12) {
+    let added = false;
+    for (const size of [7, 8, 9, 10]) {
+      const price = lotteryConfig.prices[size];
+      if (!price || price > remainingBudget) continue;
+      
+      const numbers = generateNumberCombination(size, analysis, existingNumbers);
+      if (!numbers) continue;
+      
+      const gameKey = numbers.sort((a, b) => a - b).join(',');
+      if (existingNumbers.has(gameKey)) continue;
+      
+      existingNumbers.add(gameKey);
+      
+      suggestions.push({
+        id: `suggestion-${gameIndex}`,
+        numbers: numbers.sort((a, b) => a - b),
+        cost: price,
+        type: `${size} dezenas`,
+        reason: getReasonForGame(size, numbers, analysis),
+      });
+      
+      remainingBudget -= price;
+      gameIndex++;
+      added = true;
+      break;
+    }
+    
+    if (!added || suggestions.length >= 12) break;
+  }
+  
+  return suggestions;
+}
+
+function generateNumberCombination(
+  size: number,
+  analysis: NumberAnalysis,
+  existingGames: Set<string>
+): number[] | null {
+  const numbers: Set<number> = new Set();
+  
+  const mostVotedCount = Math.ceil(size * 0.4);
+  const shuffledMostVoted = [...analysis.mostVoted].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < mostVotedCount && numbers.size < size; i++) {
+    if (shuffledMostVoted[i]) {
+      numbers.add(shuffledMostVoted[i].number);
+    }
+  }
+  
+  const notVotedCount = Math.ceil(size * 0.3);
+  const shuffledNotVoted = [...analysis.notVoted].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < notVotedCount && numbers.size < size; i++) {
+    if (shuffledNotVoted[i]) {
+      numbers.add(shuffledNotVoted[i]);
+    }
+  }
+  
+  const shuffledLeastVoted = [...analysis.leastVoted].sort(() => Math.random() - 0.5);
+  for (let i = 0; numbers.size < size && i < shuffledLeastVoted.length; i++) {
+    numbers.add(shuffledLeastVoted[i].number);
+  }
+  
+  while (numbers.size < size) {
+    const randomNum = Math.floor(Math.random() * 60) + 1;
+    numbers.add(randomNum);
+  }
+  
+  return Array.from(numbers);
+}
+
+function getReasonForGame(size: number, numbers: number[], analysis: NumberAnalysis): string {
+  const hotNumbers = numbers.filter(n => 
+    analysis.mostVoted.some(m => m.number === n)
+  ).length;
+  const coldNumbers = numbers.filter(n => 
+    analysis.notVoted.includes(n)
+  ).length;
+  
+  if (hotNumbers >= size * 0.5) {
+    return `Jogo com ${hotNumbers} números quentes (mais votados pelos participantes)`;
+  } else if (coldNumbers >= size * 0.3) {
+    return `Jogo diversificado com ${coldNumbers} números frios para aumentar cobertura`;
+  } else {
+    return `Combinação balanceada entre números populares e oportunidades`;
+  }
 }
 
 serve(async (req) => {
@@ -52,145 +189,37 @@ serve(async (req) => {
   }
 
   try {
-    const { totalArrecadado, tipoLoteria, lotteryConfig, apostas } = await req.json() as {
+    const { totalArrecadado, lotteryConfig, apostas } = await req.json() as {
       totalArrecadado: number;
-      tipoLoteria: string;
       lotteryConfig: LotteryConfig;
       apostas: Aposta[];
     };
+
+    const analysis = analyzeNumbers(apostas, lotteryConfig.numberRange);
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    // Analyze numbers
-    const { mostVoted, leastVoted, notVoted } = analyzeNumbers(apostas, lotteryConfig.numberRange);
-
-    // Format paid bets for the prompt
-    const apostasFormatadas = apostas.map((a, i) => 
-      `${i + 1}. ${a.apelido}: [${a.dezenas.map(n => n.toString().padStart(2, "0")).join(", ")}]`
-    ).join("\n");
-
-    // Format prices table
-    const pricesTable = Object.entries(lotteryConfig.prices)
-      .map(([nums, price]) => `${nums} números: R$ ${price.toFixed(2)}`)
-      .join("\n");
-
-    // Format number analysis
-    const mostVotedStr = mostVoted.map(e => `${e.number.toString().padStart(2, "0")} (${e.count}x)`).join(", ");
-    const leastVotedStr = leastVoted.map(e => `${e.number.toString().padStart(2, "0")} (${e.count}x)`).join(", ");
-    const notVotedStr = notVoted.length > 0 
-      ? notVoted.map(n => n.toString().padStart(2, "0")).join(", ")
-      : "Todos os números foram votados";
-
-    const systemPrompt = `Você é um especialista em loterias brasileiras da Caixa Econômica Federal e estrategista de bolões.
-Sua função é analisar as apostas de um bolão e sugerir a melhor estratégia de jogos considerando o orçamento disponível.
-
-LOTERIA SELECIONADA: ${lotteryConfig.name}
-- Faixa de números: 01 a ${lotteryConfig.numberRange}
-- Mínimo de números por jogo: ${lotteryConfig.minNumbers}
-- Máximo de números por jogo: ${lotteryConfig.maxNumbers}
-
-TABELA DE PREÇOS (${lotteryConfig.name}):
-${pricesTable}
-
-ANÁLISE DE NÚMEROS:
-- MAIS VOTADOS pelos participantes: ${mostVotedStr}
-- MENOS VOTADOS pelos participantes: ${leastVotedStr}
-- NÃO VOTADOS (números disponíveis): ${notVotedStr}
-
-IMPORTANTE:
-1. Os jogos dos participantes SÃO as apostas oficiais do bolão - cada participante já escolheu suas 6 dezenas
-2. Calcule primeiro o custo total para registrar TODOS os jogos individuais dos participantes
-3. Se sobrar orçamento após os jogos individuais, sugira JOGOS ADICIONAIS específicos:
-   - Crie combinações que complementem os jogos existentes
-   - Considere os números mais votados para aumentar chances de prêmio compartilhado
-   - Considere números menos votados ou não votados para diversificar
-4. Para cada jogo adicional sugerido, mostre:
-   - Os 6 números específicos do jogo (ex: [01, 12, 23, 34, 45, 56])
-   - O custo do jogo
-   - O saldo restante após esse jogo
-5. Calcule quantos jogos cabem no orçamento restante
-
-FORMATO DA RESPOSTA:
-Use markdown com seções claras e emojis para facilitar leitura.
-Apresente os jogos sugeridos em formato de tabela ou lista numerada com os números bem destacados.`;
-
-    const userPrompt = `ORÇAMENTO TOTAL: R$ ${totalArrecadado.toFixed(2)}
-QUANTIDADE DE PARTICIPANTES (apostas pagas): ${apostas.length}
-CUSTO POR JOGO INDIVIDUAL: R$ ${lotteryConfig.prices[lotteryConfig.minNumbers].toFixed(2)} (${lotteryConfig.minNumbers} números)
-
-JOGOS DOS PARTICIPANTES (cada um = 1 aposta oficial):
-${apostasFormatadas}
-
-Por favor:
-1. 📊 RESUMO FINANCEIRO:
-   - Custo total dos ${apostas.length} jogos individuais
-   - Saldo restante para jogos adicionais
-
-2. 🎯 ANÁLISE DOS NÚMEROS:
-   - Números mais escolhidos (quentes)
-   - Números pouco escolhidos (frios)
-   - Números não escolhidos (oportunidade)
-
-3. 🎲 SUGESTÃO DE JOGOS ADICIONAIS (se houver saldo):
-   Para cada jogo, apresente:
-   | Jogo # | Dezenas | Custo | Saldo Após |
-   Com os números específicos sugeridos
-
-4. 💰 RESUMO FINAL:
-   - Total de jogos do bolão (individuais + adicionais)
-   - Valor total gasto
-   - Saldo final
-
-Seja específico com os números de cada jogo sugerido!`;
-
-    console.log("Sending request to AI with prompt:", userPrompt);
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Limite de requisições excedido. Tente novamente em alguns minutos." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Créditos insuficientes. Entre em contato com o suporte." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: "Erro ao gerar sugestões" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const data = await response.json();
-    const suggestion = data.choices?.[0]?.message?.content || "Não foi possível gerar sugestões.";
-
-    console.log("AI suggestion generated successfully");
+    const individualGamesCost = apostas.length * lotteryConfig.prices[lotteryConfig.minNumbers];
+    const availableBudget = totalArrecadado - individualGamesCost;
+    
+    const existingGames = new Set<string>(
+      apostas.map(a => a.dezenas.sort((x, y) => x - y).join(','))
+    );
+    
+    const suggestions = generateGameSuggestions(
+      availableBudget,
+      analysis,
+      lotteryConfig,
+      existingGames
+    );
+    
+    console.log(`Generated ${suggestions.length} game suggestions for budget R$ ${availableBudget.toFixed(2)}`);
 
     return new Response(
-      JSON.stringify({ suggestion }),
+      JSON.stringify({
+        analysis,
+        suggestions,
+        individualGamesCost,
+        availableBudget,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
