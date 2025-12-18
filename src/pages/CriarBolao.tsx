@@ -10,12 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { createBolaoSchema, CreateBolaoInput, LOTTERY_TYPES } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Loader2, Copy, Check, ArrowLeft } from "lucide-react";
+import { Loader2, Copy, Check, ArrowLeft, CalendarIcon } from "lucide-react";
 import { Link } from "react-router-dom";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 export default function CriarBolao() {
   const { user } = useAuth();
@@ -23,6 +28,7 @@ export default function CriarBolao() {
   const [isLoading, setIsLoading] = useState(false);
   const [createdBolao, setCreatedBolao] = useState<{ id: string; link: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
 
   const form = useForm<CreateBolaoInput>({
     resolver: zodResolver(createBolaoSchema),
@@ -31,6 +37,8 @@ export default function CriarBolao() {
       chave_pix: "",
       tipo_loteria: "megasena",
       valor_cota: 10,
+      data_sorteio: "",
+      numero_concurso: undefined,
       observacoes: "",
     },
   });
@@ -48,6 +56,8 @@ export default function CriarBolao() {
         chave_pix: data.chave_pix.trim(),
         tipo_loteria: data.tipo_loteria,
         valor_cota: data.valor_cota,
+        data_sorteio: data.data_sorteio || null,
+        numero_concurso: data.numero_concurso || null,
         observacoes: data.observacoes?.trim() || null,
       })
       .select("id")
@@ -175,11 +185,64 @@ export default function CriarBolao() {
                       )}
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Data do Sorteio</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                "w-full justify-start text-left font-normal",
+                                !selectedDate && "text-muted-foreground"
+                              )}
+                              disabled={isLoading}
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {selectedDate ? (
+                                format(selectedDate, "dd/MM/yyyy", { locale: ptBR })
+                              ) : (
+                                "Selecione"
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date) => {
+                                setSelectedDate(date);
+                                form.setValue("data_sorteio", date ? format(date, "yyyy-MM-dd") : "");
+                              }}
+                              locale={ptBR}
+                              disabled={(date) => date < new Date()}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="concurso">Nº do Concurso</Label>
+                        <Input
+                          id="concurso"
+                          type="number"
+                          placeholder="Ex: 2800"
+                          {...form.register("numero_concurso", { valueAsNumber: true })}
+                          disabled={isLoading}
+                        />
+                        {form.formState.errors.numero_concurso && (
+                          <p className="text-sm text-destructive">
+                            {form.formState.errors.numero_concurso.message}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
                       <Label htmlFor="obs">Observações (opcional)</Label>
                       <Textarea
                         id="obs"
-                        placeholder="Informações adicionais como regras, data do sorteio, etc."
+                        placeholder="Informações adicionais como regras, etc."
                         rows={3}
                         {...form.register("observacoes")}
                         disabled={isLoading}
