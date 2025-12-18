@@ -54,6 +54,7 @@ export default function BolaoDetalhes() {
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [loadingMoreSuggestions, setLoadingMoreSuggestions] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<SuggestionsData | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -183,6 +184,57 @@ export default function BolaoDetalhes() {
       toast.error("Erro ao gerar sugestões de jogos");
     } finally {
       setLoadingSuggestions(false);
+    }
+  };
+
+  const handleRequestMoreSuggestions = async (excludeIds: string[], alreadySelectedCost: number): Promise<SuggestedGame[]> => {
+    const apostasParaIA = paidApostas.map(a => ({
+      apelido: a.apelido,
+      dezenas: a.dezenas.sort((x, y) => x - y),
+    }));
+
+    const lotteryType = bolao?.tipo_loteria || "megasena";
+    const lotteryConfig = LOTTERY_TYPES[lotteryType as keyof typeof LOTTERY_TYPES];
+
+    setLoadingMoreSuggestions(true);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-games`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          totalArrecadado,
+          lotteryConfig,
+          apostas: apostasParaIA,
+          excludeIds,
+          alreadySelectedCost,
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast.error("Limite de requisições excedido. Tente novamente em alguns minutos.");
+          return [];
+        }
+        if (response.status === 402) {
+          toast.error("Créditos insuficientes. Entre em contato com o suporte.");
+          return [];
+        }
+        throw new Error("Erro ao gerar sugestões");
+      }
+
+      const data = await response.json();
+      toast.success(`Mais ${data.suggestions.length} jogos sugeridos!`);
+      return data.suggestions;
+    } catch (error) {
+      console.error("Error getting more suggestions:", error);
+      toast.error("Erro ao gerar mais sugestões");
+      return [];
+    } finally {
+      setLoadingMoreSuggestions(false);
     }
   };
 
@@ -336,6 +388,9 @@ export default function BolaoDetalhes() {
                 onSelectionChange={(selectedGames, remainingBudget) => {
                   console.log("Selected games:", selectedGames.length, "Remaining:", remainingBudget);
                 }}
+                onRequestMoreSuggestions={handleRequestMoreSuggestions}
+                isLoadingMore={loadingMoreSuggestions}
+                minGameCost={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices[7] || 4.50}
               />
             )}
 
