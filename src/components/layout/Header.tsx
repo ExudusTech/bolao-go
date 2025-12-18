@@ -1,22 +1,11 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { LogOut, LayoutDashboard, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { UserMenu } from "@/components/layout/UserMenu";
+import { LayoutDashboard, Plus } from "lucide-react";
 
 export function Header() {
-  const { user, signOut } = useAuth();
-  const navigate = useNavigate();
-
-  const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
-      toast.error("Erro ao sair");
-    } else {
-      toast.success("Você saiu com sucesso");
-      navigate("/");
-    }
-  };
+  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-primary/95 backdrop-blur supports-[backdrop-filter]:bg-primary/90">
@@ -31,9 +20,6 @@ export function Header() {
         <nav className="flex items-center gap-2">
           {user ? (
             <>
-              <span className="hidden md:inline text-sm text-primary-foreground/70 mr-2">
-                {user.email}
-              </span>
               <Button variant="ghost" size="sm" asChild className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
                 <Link to="/gestor/dashboard" className="flex items-center gap-2">
                   <LayoutDashboard className="h-4 w-4" />
@@ -46,10 +32,7 @@ export function Header() {
                   <span className="hidden sm:inline">Novo Bolão</span>
                 </Link>
               </Button>
-              <Button variant="ghost" size="sm" onClick={handleSignOut} className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
-                <LogOut className="h-4 w-4" />
-                <span className="sr-only">Sair</span>
-              </Button>
+              <UserMenu />
             </>
           ) : (
             <>
