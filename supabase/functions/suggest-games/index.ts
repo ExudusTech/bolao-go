@@ -18,6 +18,34 @@ interface Aposta {
   dezenas: number[];
 }
 
+function analyzeNumbers(apostas: Aposta[], numberRange: number) {
+  const frequency: Record<number, number> = {};
+  
+  // Initialize all numbers with 0
+  for (let i = 1; i <= numberRange; i++) {
+    frequency[i] = 0;
+  }
+  
+  // Count frequency
+  apostas.forEach(a => {
+    a.dezenas.forEach(n => {
+      frequency[n] = (frequency[n] || 0) + 1;
+    });
+  });
+  
+  const entries = Object.entries(frequency).map(([num, count]) => ({
+    number: parseInt(num),
+    count
+  }));
+  
+  const sorted = [...entries].sort((a, b) => b.count - a.count);
+  const mostVoted = sorted.filter(e => e.count > 0).slice(0, 10);
+  const leastVoted = sorted.filter(e => e.count > 0).reverse().slice(0, 10);
+  const notVoted = entries.filter(e => e.count === 0).map(e => e.number);
+  
+  return { frequency, mostVoted, leastVoted, notVoted };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -36,6 +64,9 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // Analyze numbers
+    const { mostVoted, leastVoted, notVoted } = analyzeNumbers(apostas, lotteryConfig.numberRange);
+
     // Format paid bets for the prompt
     const apostasFormatadas = apostas.map((a, i) => 
       `${i + 1}. ${a.apelido}: [${a.dezenas.map(n => n.toString().padStart(2, "0")).join(", ")}]`
@@ -46,38 +77,74 @@ serve(async (req) => {
       .map(([nums, price]) => `${nums} números: R$ ${price.toFixed(2)}`)
       .join("\n");
 
-    const systemPrompt = `Você é um especialista em loterias brasileiras da Caixa Econômica Federal.
-Sua função é ajudar gestores de bolões a decidir como usar o dinheiro arrecadado.
+    // Format number analysis
+    const mostVotedStr = mostVoted.map(e => `${e.number.toString().padStart(2, "0")} (${e.count}x)`).join(", ");
+    const leastVotedStr = leastVoted.map(e => `${e.number.toString().padStart(2, "0")} (${e.count}x)`).join(", ");
+    const notVotedStr = notVoted.length > 0 
+      ? notVoted.map(n => n.toString().padStart(2, "0")).join(", ")
+      : "Todos os números foram votados";
+
+    const systemPrompt = `Você é um especialista em loterias brasileiras da Caixa Econômica Federal e estrategista de bolões.
+Sua função é analisar as apostas de um bolão e sugerir a melhor estratégia de jogos considerando o orçamento disponível.
 
 LOTERIA SELECIONADA: ${lotteryConfig.name}
 - Faixa de números: 01 a ${lotteryConfig.numberRange}
-- Mínimo de números: ${lotteryConfig.minNumbers}
-- Máximo de números: ${lotteryConfig.maxNumbers}
+- Mínimo de números por jogo: ${lotteryConfig.minNumbers}
+- Máximo de números por jogo: ${lotteryConfig.maxNumbers}
 
 TABELA DE PREÇOS (${lotteryConfig.name}):
 ${pricesTable}
 
+ANÁLISE DE NÚMEROS:
+- MAIS VOTADOS pelos participantes: ${mostVotedStr}
+- MENOS VOTADOS pelos participantes: ${leastVotedStr}
+- NÃO VOTADOS (números disponíveis): ${notVotedStr}
+
 IMPORTANTE:
-1. Os participantes já fizeram seus jogos (listados abaixo). Esses jogos DEVEM ser considerados como apostas a serem registradas.
-2. O gestor precisa saber: com o valor arrecadado, é possível registrar todos esses jogos?
-3. Se sobrar dinheiro, sugira combinações adicionais que complementem os jogos existentes.
-4. Considere os números mais frequentes entre os participantes para as sugestões adicionais.
+1. Os jogos dos participantes SÃO as apostas oficiais do bolão - cada participante já escolheu suas 6 dezenas
+2. Calcule primeiro o custo total para registrar TODOS os jogos individuais dos participantes
+3. Se sobrar orçamento após os jogos individuais, sugira JOGOS ADICIONAIS específicos:
+   - Crie combinações que complementem os jogos existentes
+   - Considere os números mais votados para aumentar chances de prêmio compartilhado
+   - Considere números menos votados ou não votados para diversificar
+4. Para cada jogo adicional sugerido, mostre:
+   - Os 6 números específicos do jogo (ex: [01, 12, 23, 34, 45, 56])
+   - O custo do jogo
+   - O saldo restante após esse jogo
+5. Calcule quantos jogos cabem no orçamento restante
 
-Responda de forma clara e objetiva em português brasileiro.`;
+FORMATO DA RESPOSTA:
+Use markdown com seções claras e emojis para facilitar leitura.
+Apresente os jogos sugeridos em formato de tabela ou lista numerada com os números bem destacados.`;
 
-    const userPrompt = `VALOR TOTAL ARRECADADO: R$ ${totalArrecadado.toFixed(2)}
-QUANTIDADE DE APOSTAS PAGAS: ${apostas.length}
+    const userPrompt = `ORÇAMENTO TOTAL: R$ ${totalArrecadado.toFixed(2)}
+QUANTIDADE DE PARTICIPANTES (apostas pagas): ${apostas.length}
+CUSTO POR JOGO INDIVIDUAL: R$ ${lotteryConfig.prices[lotteryConfig.minNumbers].toFixed(2)} (${lotteryConfig.minNumbers} números)
 
-JOGOS DOS PARTICIPANTES QUE DEVEM SER APOSTADOS:
+JOGOS DOS PARTICIPANTES (cada um = 1 aposta oficial):
 ${apostasFormatadas}
 
-Com base nesses dados:
-1. Calcule o custo total para registrar todos os jogos dos participantes (cada jogo tem ${lotteryConfig.minNumbers} números = R$ ${lotteryConfig.prices[lotteryConfig.minNumbers].toFixed(2)})
-2. Informe se o valor arrecadado é suficiente
-3. Se sobrar dinheiro, sugira combinações adicionais considerando os números mais escolhidos pelos participantes
-4. Se faltar dinheiro, explique quanto falta
+Por favor:
+1. 📊 RESUMO FINANCEIRO:
+   - Custo total dos ${apostas.length} jogos individuais
+   - Saldo restante para jogos adicionais
 
-Seja prático e direto.`;
+2. 🎯 ANÁLISE DOS NÚMEROS:
+   - Números mais escolhidos (quentes)
+   - Números pouco escolhidos (frios)
+   - Números não escolhidos (oportunidade)
+
+3. 🎲 SUGESTÃO DE JOGOS ADICIONAIS (se houver saldo):
+   Para cada jogo, apresente:
+   | Jogo # | Dezenas | Custo | Saldo Após |
+   Com os números específicos sugeridos
+
+4. 💰 RESUMO FINAL:
+   - Total de jogos do bolão (individuais + adicionais)
+   - Valor total gasto
+   - Saldo final
+
+Seja específico com os números de cada jogo sugerido!`;
 
     console.log("Sending request to AI with prompt:", userPrompt);
 
