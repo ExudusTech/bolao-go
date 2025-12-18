@@ -65,10 +65,15 @@ export type Database = {
         Row: {
           chave_pix: string
           created_at: string
+          data_sorteio: string | null
           gestor_id: string
           id: string
           nome_do_bolao: string
+          notificacao_aprovada: boolean | null
+          numero_concurso: number | null
+          numeros_sorteados: number[] | null
           observacoes: string | null
+          resultado_verificado: boolean | null
           tipo_loteria: string
           total_apostas: number
           updated_at: string
@@ -77,10 +82,15 @@ export type Database = {
         Insert: {
           chave_pix: string
           created_at?: string
+          data_sorteio?: string | null
           gestor_id: string
           id?: string
           nome_do_bolao: string
+          notificacao_aprovada?: boolean | null
+          numero_concurso?: number | null
+          numeros_sorteados?: number[] | null
           observacoes?: string | null
+          resultado_verificado?: boolean | null
           tipo_loteria?: string
           total_apostas?: number
           updated_at?: string
@@ -89,10 +99,15 @@ export type Database = {
         Update: {
           chave_pix?: string
           created_at?: string
+          data_sorteio?: string | null
           gestor_id?: string
           id?: string
           nome_do_bolao?: string
+          notificacao_aprovada?: boolean | null
+          numero_concurso?: number | null
+          numeros_sorteados?: number[] | null
           observacoes?: string | null
+          resultado_verificado?: boolean | null
           tipo_loteria?: string
           total_apostas?: number
           updated_at?: string
