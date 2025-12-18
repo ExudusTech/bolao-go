@@ -55,6 +55,7 @@ export default function BolaoDetalhes() {
   const [exporting, setExporting] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [loadingMoreSuggestions, setLoadingMoreSuggestions] = useState(false);
+  const [savingGames, setSavingGames] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<SuggestionsData | null>(null);
 
   const fetchData = useCallback(async () => {
@@ -238,6 +239,58 @@ export default function BolaoDetalhes() {
     }
   };
 
+  const handleSaveGames = async (games: SuggestedGame[]): Promise<boolean> => {
+    if (!id || games.length === 0) return false;
+
+    setSavingGames(true);
+
+    try {
+      // First delete existing saved games for this bolao
+      const { error: deleteError } = await supabase
+        .from("jogos_selecionados")
+        .delete()
+        .eq("bolao_id", id);
+
+      if (deleteError) {
+        console.error("Error deleting old games:", deleteError);
+      }
+
+      // Insert new games
+      const gamesToInsert = games.map(game => ({
+        bolao_id: id,
+        dezenas: game.numbers,
+        tipo: game.type,
+        custo: game.cost,
+        categoria: game.reason.includes("MAIS VOTADOS") 
+          ? "mais votados" 
+          : game.reason.includes("MENOS VOTADOS") 
+            ? "menos votados" 
+            : game.reason.includes("NÃO VOTADOS")
+              ? "não votados"
+              : "misto",
+      }));
+
+      const { error: insertError } = await supabase
+        .from("jogos_selecionados")
+        .insert(gamesToInsert);
+
+      if (insertError) {
+        console.error("Error saving games:", insertError);
+        toast.error("Erro ao salvar jogos");
+        return false;
+      }
+
+      toast.success(`${games.length} jogos salvos com sucesso!`);
+      return true;
+    } catch (error) {
+      console.error("Error saving games:", error);
+      toast.error("Erro ao salvar jogos");
+      return false;
+    } finally {
+      setSavingGames(false);
+    }
+  };
+
   if (loading) {
     return (
       <AuthGuard>
@@ -389,8 +442,11 @@ export default function BolaoDetalhes() {
                   console.log("Selected games:", selectedGames.length, "Remaining:", remainingBudget);
                 }}
                 onRequestMoreSuggestions={handleRequestMoreSuggestions}
+                onSaveGames={handleSaveGames}
                 isLoadingMore={loadingMoreSuggestions}
+                isSaving={savingGames}
                 minGameCost={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices[7] || 4.50}
+                lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
               />
             )}
 
