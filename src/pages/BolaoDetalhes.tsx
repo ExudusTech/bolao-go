@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
+import { GameSuggestions, SuggestedGame } from "@/components/bolao/GameSuggestions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,19 @@ interface Aposta {
   receipt_url: string | null;
 }
 
+interface NumberAnalysis {
+  mostVoted: Array<{ number: number; count: number }>;
+  leastVoted: Array<{ number: number; count: number }>;
+  notVoted: number[];
+}
+
+interface SuggestionsData {
+  analysis: NumberAnalysis;
+  suggestions: SuggestedGame[];
+  individualGamesCost: number;
+  availableBudget: number;
+}
+
 export default function BolaoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const [bolao, setBolao] = useState<Bolao | null>(null);
@@ -40,7 +54,7 @@ export default function BolaoDetalhes() {
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState<string | null>(null);
+  const [suggestionsData, setSuggestionsData] = useState<SuggestionsData | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -125,9 +139,8 @@ export default function BolaoDetalhes() {
     }
 
     setLoadingSuggestions(true);
-    setSuggestions(null);
+    setSuggestionsData(null);
 
-    // Get all paid bets with their numbers
     const apostasParaIA = paidApostas.map(a => ({
       apelido: a.apelido,
       dezenas: a.dezenas.sort((x, y) => x - y),
@@ -145,7 +158,6 @@ export default function BolaoDetalhes() {
         },
         body: JSON.stringify({
           totalArrecadado,
-          tipoLoteria: lotteryType,
           lotteryConfig,
           apostas: apostasParaIA,
         }),
@@ -164,7 +176,8 @@ export default function BolaoDetalhes() {
       }
 
       const data = await response.json();
-      setSuggestions(data.suggestion);
+      setSuggestionsData(data);
+      toast.success(`${data.suggestions.length} jogos sugeridos!`);
     } catch (error) {
       console.error("Error getting suggestions:", error);
       toast.error("Erro ao gerar sugestões de jogos");
@@ -314,23 +327,16 @@ export default function BolaoDetalhes() {
             </Card>
 
             {/* AI Suggestions */}
-            {suggestions && (
-              <Card className="animate-fade-in border-accent/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-accent">
-                    <Sparkles className="h-5 w-5" />
-                    Sugestões de Jogos
-                  </CardTitle>
-                  <CardDescription>
-                    Baseado em R$ {totalArrecadado.toFixed(2)} arrecadados de {paidApostas.length} apostas
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="prose prose-sm max-w-none dark:prose-invert whitespace-pre-wrap">
-                    {suggestions}
-                  </div>
-                </CardContent>
-              </Card>
+            {suggestionsData && (
+              <GameSuggestions
+                totalBudget={totalArrecadado}
+                individualGamesCost={suggestionsData.individualGamesCost}
+                suggestions={suggestionsData.suggestions}
+                analysis={suggestionsData.analysis}
+                onSelectionChange={(selectedGames, remainingBudget) => {
+                  console.log("Selected games:", selectedGames.length, "Remaining:", remainingBudget);
+                }}
+              />
             )}
 
             {/* Bets Table */}
