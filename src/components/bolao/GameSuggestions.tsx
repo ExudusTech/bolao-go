@@ -2,13 +2,14 @@ import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, DollarSign, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sparkles, DollarSign, Check, RefreshCw, Loader2 } from "lucide-react";
 
 export interface SuggestedGame {
   id: string;
   numbers: number[];
   cost: number;
-  type: string; // "7 dezenas", "8 dezenas", etc.
+  type: string;
   reason: string;
 }
 
@@ -24,35 +25,50 @@ interface GameSuggestionsProps {
   suggestions: SuggestedGame[];
   analysis: NumberAnalysis;
   onSelectionChange?: (selectedGames: SuggestedGame[], remainingBudget: number) => void;
+  onRequestMoreSuggestions?: (excludeIds: string[], alreadySelectedCost: number) => Promise<SuggestedGame[]>;
+  isLoadingMore?: boolean;
+  minGameCost?: number;
 }
 
 export function GameSuggestions({
   totalBudget,
   individualGamesCost,
-  suggestions,
+  suggestions: initialSuggestions,
   analysis,
   onSelectionChange,
+  onRequestMoreSuggestions,
+  isLoadingMore = false,
+  minGameCost = 4.50,
 }: GameSuggestionsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [allSuggestions, setAllSuggestions] = useState<SuggestedGame[]>(initialSuggestions);
+
+  // Update suggestions when prop changes
+  useMemo(() => {
+    const existingIds = new Set(allSuggestions.map(s => s.id));
+    const newSuggestions = initialSuggestions.filter(s => !existingIds.has(s.id));
+    if (newSuggestions.length > 0) {
+      setAllSuggestions(prev => [...prev, ...newSuggestions]);
+    }
+  }, [initialSuggestions]);
 
   const availableBudget = totalBudget - individualGamesCost;
 
-  const { selectedCost, remainingBudget } = useMemo(() => {
-    const cost = suggestions
-      .filter(s => selectedIds.has(s.id))
-      .reduce((sum, s) => sum + s.cost, 0);
+  const { selectedCost, remainingBudget, selectedGames } = useMemo(() => {
+    const selected = allSuggestions.filter(s => selectedIds.has(s.id));
+    const cost = selected.reduce((sum, s) => sum + s.cost, 0);
     return {
       selectedCost: cost,
       remainingBudget: availableBudget - cost,
+      selectedGames: selected,
     };
-  }, [selectedIds, suggestions, availableBudget]);
+  }, [selectedIds, allSuggestions, availableBudget]);
 
   const handleToggle = (game: SuggestedGame) => {
     const newSelected = new Set(selectedIds);
     if (newSelected.has(game.id)) {
       newSelected.delete(game.id);
     } else {
-      // Check if can afford
       const newCost = selectedCost + game.cost;
       if (newCost <= availableBudget) {
         newSelected.add(game.id);
@@ -60,15 +76,28 @@ export function GameSuggestions({
     }
     setSelectedIds(newSelected);
     
-    const selectedGames = suggestions.filter(s => newSelected.has(s.id));
-    const newRemaining = availableBudget - selectedGames.reduce((sum, s) => sum + s.cost, 0);
-    onSelectionChange?.(selectedGames, newRemaining);
+    const newSelectedGames = allSuggestions.filter(s => newSelected.has(s.id));
+    const newRemaining = availableBudget - newSelectedGames.reduce((sum, s) => sum + s.cost, 0);
+    onSelectionChange?.(newSelectedGames, newRemaining);
   };
 
   const canAfford = (game: SuggestedGame) => {
     if (selectedIds.has(game.id)) return true;
     return (remainingBudget - game.cost) >= 0;
   };
+
+  const handleRequestMore = async () => {
+    if (!onRequestMoreSuggestions) return;
+    const excludeIds = allSuggestions.map(s => s.id);
+    const newSuggestions = await onRequestMoreSuggestions(excludeIds, selectedCost);
+    if (newSuggestions.length > 0) {
+      setAllSuggestions(prev => [...prev, ...newSuggestions]);
+    }
+  };
+
+  const canRequestMore = remainingBudget >= minGameCost && onRequestMoreSuggestions;
+  const unselectedSuggestions = allSuggestions.filter(s => !selectedIds.has(s.id));
+  const hasAffordableUnselected = unselectedSuggestions.some(s => s.cost <= remainingBudget);
 
   return (
     <Card className="animate-fade-in border-accent/50">
@@ -78,7 +107,7 @@ export function GameSuggestions({
           Sugestões de Jogos
         </CardTitle>
         <CardDescription>
-          Selecione os jogos que deseja incluir no bolão
+          Selecione os jogos até esgotar o orçamento disponível
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -93,14 +122,17 @@ export function GameSuggestions({
             <p className="text-lg font-bold text-primary">R$ {individualGamesCost.toFixed(2)}</p>
           </div>
           <div className="p-3 rounded-lg bg-muted/50 border">
-            <p className="text-xs text-muted-foreground">Jogos Adicionais</p>
+            <p className="text-xs text-muted-foreground">Jogos Selecionados</p>
             <p className="text-lg font-bold text-accent">R$ {selectedCost.toFixed(2)}</p>
           </div>
-          <div className={`p-3 rounded-lg border ${remainingBudget >= 0 ? 'bg-success/10 border-success/30' : 'bg-destructive/10 border-destructive/30'}`}>
+          <div className={`p-3 rounded-lg border ${remainingBudget < minGameCost ? 'bg-success/10 border-success/30' : 'bg-warning/10 border-warning/30'}`}>
             <p className="text-xs text-muted-foreground">Saldo Disponível</p>
-            <p className={`text-lg font-bold ${remainingBudget >= 0 ? 'text-success' : 'text-destructive'}`}>
+            <p className={`text-lg font-bold ${remainingBudget < minGameCost ? 'text-success' : 'text-warning'}`}>
               R$ {remainingBudget.toFixed(2)}
             </p>
+            {remainingBudget < minGameCost && (
+              <p className="text-xs text-success mt-1">Orçamento esgotado!</p>
+            )}
           </div>
         </div>
 
@@ -152,9 +184,9 @@ export function GameSuggestions({
 
         {/* Game Suggestions */}
         <div className="space-y-3">
-          <h4 className="text-sm font-medium">Jogos Sugeridos</h4>
+          <h4 className="text-sm font-medium">Jogos Sugeridos ({allSuggestions.length})</h4>
           <div className="space-y-2">
-            {suggestions.map((game) => {
+            {allSuggestions.map((game) => {
               const isSelected = selectedIds.has(game.id);
               const affordable = canAfford(game);
               
@@ -214,6 +246,33 @@ export function GameSuggestions({
           </div>
         </div>
 
+        {/* Request More Suggestions */}
+        {canRequestMore && !hasAffordableUnselected && (
+          <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
+            <p className="text-sm text-warning mb-3">
+              Ainda há R$ {remainingBudget.toFixed(2)} de saldo disponível. Deseja mais sugestões?
+            </p>
+            <Button 
+              onClick={handleRequestMore} 
+              disabled={isLoadingMore}
+              variant="outline"
+              className="border-warning text-warning hover:bg-warning/10"
+            >
+              {isLoadingMore ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Gerando...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Gerar Mais Sugestões
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+
         {/* Summary */}
         {selectedIds.size > 0 && (
           <div className="p-4 rounded-lg bg-accent/10 border border-accent/30">
@@ -228,6 +287,17 @@ export function GameSuggestions({
                 Saldo: R$ {remainingBudget.toFixed(2)}
               </Badge>
             </div>
+          </div>
+        )}
+
+        {/* Budget Exhausted Message */}
+        {remainingBudget < minGameCost && selectedIds.size > 0 && (
+          <div className="p-4 rounded-lg bg-success/10 border border-success/30 text-center">
+            <Check className="h-6 w-6 text-success mx-auto mb-2" />
+            <p className="font-medium text-success">Orçamento totalmente utilizado!</p>
+            <p className="text-sm text-muted-foreground">
+              {selectedIds.size} jogo(s) selecionado(s) consumindo R$ {selectedCost.toFixed(2)}
+            </p>
           </div>
         )}
       </CardContent>

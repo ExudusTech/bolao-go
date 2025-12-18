@@ -62,89 +62,146 @@ function generateGameSuggestions(
   availableBudget: number,
   analysis: NumberAnalysis,
   lotteryConfig: LotteryConfig,
-  existingNumbers: Set<string>
+  existingNumbers: Set<string>,
+  excludeIds: string[] = []
 ): SuggestedGame[] {
   const suggestions: SuggestedGame[] = [];
   let remainingBudget = availableBudget;
   let gameIndex = 1;
   
   const targetSizes = [10, 9, 8, 7];
+  const excludeSet = new Set(excludeIds);
   
-  // Category 1: Games with MOST VOTED numbers
-  for (const size of targetSizes) {
-    if (suggestions.filter(s => s.reason.includes('mais votados')).length >= 3) break;
-    const price = lotteryConfig.prices[size];
-    if (!price || price > remainingBudget) continue;
-    
-    const numbers = generateFromMostVoted(size, analysis, lotteryConfig.numberRange);
-    const gameKey = numbers.sort((a, b) => a - b).join(',');
-    if (existingNumbers.has(gameKey)) continue;
-    
-    existingNumbers.add(gameKey);
-    suggestions.push({
-      id: `suggestion-${gameIndex}`,
-      numbers: numbers.sort((a, b) => a - b),
-      cost: price,
-      type: `${size} dezenas`,
-      reason: `Jogo com os ${size} números MAIS VOTADOS pelos participantes`,
-    });
-    
-    remainingBudget -= price;
-    gameIndex++;
-  }
+  // Keep generating until budget is exhausted
+  let attempts = 0;
+  const maxAttempts = 50; // Prevent infinite loop
   
-  // Category 2: Games with LEAST VOTED numbers
-  for (const size of targetSizes) {
-    if (suggestions.filter(s => s.reason.includes('menos votados')).length >= 3) break;
-    const price = lotteryConfig.prices[size];
-    if (!price || price > remainingBudget) continue;
+  while (remainingBudget >= lotteryConfig.prices[7] && attempts < maxAttempts) {
+    attempts++;
+    let addedGame = false;
     
-    const numbers = generateFromLeastVoted(size, analysis, lotteryConfig.numberRange);
-    const gameKey = numbers.sort((a, b) => a - b).join(',');
-    if (existingNumbers.has(gameKey)) continue;
+    // Try to add a game from each category in rotation
+    const categories = [
+      { name: 'mais votados', generator: generateFromMostVoted, count: suggestions.filter(s => s.reason.includes('mais votados')).length },
+      { name: 'menos votados', generator: generateFromLeastVoted, count: suggestions.filter(s => s.reason.includes('menos votados')).length },
+      { name: 'NÃO VOTADOS', generator: generateFromNotVoted, count: suggestions.filter(s => s.reason.includes('NÃO VOTADOS')).length },
+    ];
     
-    existingNumbers.add(gameKey);
-    suggestions.push({
-      id: `suggestion-${gameIndex}`,
-      numbers: numbers.sort((a, b) => a - b),
-      cost: price,
-      type: `${size} dezenas`,
-      reason: `Jogo com os ${size} números MENOS VOTADOS pelos participantes`,
-    });
+    // Sort by count to balance categories
+    categories.sort((a, b) => a.count - b.count);
     
-    remainingBudget -= price;
-    gameIndex++;
-  }
-  
-  // Category 3: Games with NOT VOTED numbers
-  if (analysis.notVoted.length >= 6) {
-    for (const size of targetSizes) {
-      if (suggestions.filter(s => s.reason.includes('NÃO VOTADOS')).length >= 3) break;
-      const price = lotteryConfig.prices[size];
-      if (!price || price > remainingBudget) continue;
-      if (analysis.notVoted.length < size) continue;
+    for (const category of categories) {
+      if (addedGame) break;
       
-      const numbers = generateFromNotVoted(size, analysis);
-      if (!numbers) continue;
-      
-      const gameKey = numbers.sort((a, b) => a - b).join(',');
-      if (existingNumbers.has(gameKey)) continue;
-      
-      existingNumbers.add(gameKey);
-      suggestions.push({
-        id: `suggestion-${gameIndex}`,
-        numbers: numbers.sort((a, b) => a - b),
-        cost: price,
-        type: `${size} dezenas`,
-        reason: `Jogo com ${size} números NÃO VOTADOS por nenhum participante`,
-      });
-      
-      remainingBudget -= price;
-      gameIndex++;
+      // Try larger games first, then smaller
+      for (const size of targetSizes) {
+        const price = lotteryConfig.prices[size];
+        if (!price || price > remainingBudget) continue;
+        
+        // For NOT VOTED, check if we have enough numbers
+        if (category.name === 'NÃO VOTADOS' && analysis.notVoted.length < size) continue;
+        
+        let numbers: number[] | null = null;
+        if (category.name === 'NÃO VOTADOS') {
+          numbers = generateFromNotVoted(size, analysis);
+        } else if (category.name === 'mais votados') {
+          numbers = generateFromMostVoted(size, analysis, lotteryConfig.numberRange);
+        } else {
+          numbers = generateFromLeastVoted(size, analysis, lotteryConfig.numberRange);
+        }
+        
+        if (!numbers) continue;
+        
+        const gameKey = numbers.sort((a, b) => a - b).join(',');
+        const gameId = `suggestion-${gameIndex}`;
+        
+        if (existingNumbers.has(gameKey) || excludeSet.has(gameId)) continue;
+        
+        existingNumbers.add(gameKey);
+        
+        const reasonPrefix = category.name === 'mais votados' 
+          ? `Jogo com os ${size} números MAIS VOTADOS pelos participantes`
+          : category.name === 'menos votados'
+            ? `Jogo com os ${size} números MENOS VOTADOS pelos participantes`
+            : `Jogo com ${size} números NÃO VOTADOS por nenhum participante`;
+        
+        suggestions.push({
+          id: gameId,
+          numbers: numbers.sort((a, b) => a - b),
+          cost: price,
+          type: `${size} dezenas`,
+          reason: reasonPrefix,
+        });
+        
+        remainingBudget -= price;
+        gameIndex++;
+        addedGame = true;
+        break;
+      }
     }
+    
+    // If no game could be added in any category, try mixed approach
+    if (!addedGame) {
+      for (const size of targetSizes) {
+        const price = lotteryConfig.prices[size];
+        if (!price || price > remainingBudget) continue;
+        
+        const numbers = generateMixedGame(size, analysis, lotteryConfig.numberRange);
+        const gameKey = numbers.sort((a, b) => a - b).join(',');
+        const gameId = `suggestion-${gameIndex}`;
+        
+        if (existingNumbers.has(gameKey) || excludeSet.has(gameId)) continue;
+        
+        existingNumbers.add(gameKey);
+        suggestions.push({
+          id: gameId,
+          numbers: numbers.sort((a, b) => a - b),
+          cost: price,
+          type: `${size} dezenas`,
+          reason: `Jogo MISTO combinando números mais e menos votados`,
+        });
+        
+        remainingBudget -= price;
+        gameIndex++;
+        addedGame = true;
+        break;
+      }
+    }
+    
+    // If still no game added, break to avoid infinite loop
+    if (!addedGame) break;
   }
   
   return suggestions;
+}
+
+function generateMixedGame(size: number, analysis: NumberAnalysis, numberRange: number): number[] {
+  const numbers: Set<number> = new Set();
+  
+  // Take some from most voted
+  const mostVotedCount = Math.ceil(size / 2);
+  const sortedMostVoted = [...analysis.mostVoted].sort((a, b) => b.count - a.count);
+  for (const item of sortedMostVoted) {
+    if (numbers.size >= mostVotedCount) break;
+    numbers.add(item.number);
+  }
+  
+  // Take some from least voted
+  const sortedLeastVoted = [...analysis.leastVoted].sort((a, b) => a.count - b.count);
+  for (const item of sortedLeastVoted) {
+    if (numbers.size >= size) break;
+    if (!numbers.has(item.number)) {
+      numbers.add(item.number);
+    }
+  }
+  
+  // Fill with random if needed
+  while (numbers.size < size) {
+    const randomNum = Math.floor(Math.random() * numberRange) + 1;
+    numbers.add(randomNum);
+  }
+  
+  return Array.from(numbers);
 }
 
 function generateFromMostVoted(size: number, analysis: NumberAnalysis, numberRange: number): number[] {
@@ -198,16 +255,18 @@ serve(async (req) => {
   }
 
   try {
-    const { totalArrecadado, lotteryConfig, apostas } = await req.json() as {
+    const { totalArrecadado, lotteryConfig, apostas, excludeIds = [], alreadySelectedCost = 0 } = await req.json() as {
       totalArrecadado: number;
       lotteryConfig: LotteryConfig;
       apostas: Aposta[];
+      excludeIds?: string[];
+      alreadySelectedCost?: number;
     };
 
     const analysis = analyzeNumbers(apostas, lotteryConfig.numberRange);
     
     const individualGamesCost = apostas.length * lotteryConfig.prices[lotteryConfig.minNumbers];
-    const availableBudget = totalArrecadado - individualGamesCost;
+    const availableBudget = totalArrecadado - individualGamesCost - alreadySelectedCost;
     
     const existingGames = new Set<string>(
       apostas.map(a => a.dezenas.sort((x, y) => x - y).join(','))
@@ -217,7 +276,8 @@ serve(async (req) => {
       availableBudget,
       analysis,
       lotteryConfig,
-      existingGames
+      existingGames,
+      excludeIds
     );
     
     console.log(`Generated ${suggestions.length} game suggestions for budget R$ ${availableBudget.toFixed(2)}`);
@@ -227,7 +287,7 @@ serve(async (req) => {
         analysis,
         suggestions,
         individualGamesCost,
-        availableBudget,
+        availableBudget: totalArrecadado - individualGamesCost, // Return full available budget
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
