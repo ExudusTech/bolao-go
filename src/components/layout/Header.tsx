@@ -31,6 +31,9 @@ export function Header() {
         <nav className="flex items-center gap-2">
           {user ? (
             <>
+              <span className="hidden md:inline text-sm text-primary-foreground/70 mr-2">
+                {user.email}
+              </span>
               <Button variant="ghost" size="sm" asChild className="text-primary-foreground hover:bg-white/10 hover:text-primary-foreground">
                 <Link to="/gestor/dashboard" className="flex items-center gap-2">
                   <LayoutDashboard className="h-4 w-4" />
