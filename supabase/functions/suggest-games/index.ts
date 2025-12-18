@@ -255,12 +255,24 @@ serve(async (req) => {
   }
 
   try {
-    const { totalArrecadado, lotteryConfig, apostas, excludeIds = [], alreadySelectedCost = 0 } = await req.json() as {
+    const body = await req.json();
+    const { 
+      totalArrecadado, 
+      lotteryConfig, 
+      apostas, 
+      excludeIds = [], 
+      alreadySelectedCost = 0,
+      customRequest 
+    } = body as {
       totalArrecadado: number;
       lotteryConfig: LotteryConfig;
       apostas: Aposta[];
       excludeIds?: string[];
       alreadySelectedCost?: number;
+      customRequest?: {
+        size: number;
+        criteria: "mais_votados" | "menos_votados" | "nao_votados" | "misto";
+      };
     };
 
     const analysis = analyzeNumbers(apostas, lotteryConfig.numberRange);
@@ -272,6 +284,73 @@ serve(async (req) => {
       apostas.map(a => a.dezenas.sort((x, y) => x - y).join(','))
     );
     
+    // Handle custom single game request
+    if (customRequest) {
+      const { size, criteria } = customRequest;
+      const price = lotteryConfig.prices[size];
+      
+      if (!price || price > availableBudget) {
+        return new Response(
+          JSON.stringify({ 
+            customGame: null,
+            error: "Orçamento insuficiente para este jogo" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      let numbers: number[] | null = null;
+      let reason = "";
+      
+      switch (criteria) {
+        case "mais_votados":
+          numbers = generateFromMostVoted(size, analysis, lotteryConfig.numberRange);
+          reason = `Jogo personalizado com ${size} números MAIS VOTADOS`;
+          break;
+        case "menos_votados":
+          numbers = generateFromLeastVoted(size, analysis, lotteryConfig.numberRange);
+          reason = `Jogo personalizado com ${size} números MENOS VOTADOS`;
+          break;
+        case "nao_votados":
+          if (analysis.notVoted.length >= size) {
+            numbers = generateFromNotVoted(size, analysis);
+            reason = `Jogo personalizado com ${size} números NÃO VOTADOS`;
+          }
+          break;
+        case "misto":
+          numbers = generateMixedGame(size, analysis, lotteryConfig.numberRange);
+          reason = `Jogo personalizado MISTO com ${size} números`;
+          break;
+      }
+      
+      if (!numbers) {
+        return new Response(
+          JSON.stringify({ 
+            customGame: null,
+            error: "Não há números suficientes para este critério" 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
+      const gameId = `custom-${Date.now()}`;
+      const customGame: SuggestedGame = {
+        id: gameId,
+        numbers: numbers.sort((a, b) => a - b),
+        cost: price,
+        type: `${size} dezenas`,
+        reason,
+      };
+      
+      console.log(`Generated custom game: ${size} numbers, criteria: ${criteria}`);
+      
+      return new Response(
+        JSON.stringify({ customGame }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Regular suggestions generation
     const suggestions = generateGameSuggestions(
       availableBudget,
       analysis,
@@ -287,7 +366,7 @@ serve(async (req) => {
         analysis,
         suggestions,
         individualGamesCost,
-        availableBudget: totalArrecadado - individualGamesCost, // Return full available budget
+        availableBudget: totalArrecadado - individualGamesCost,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

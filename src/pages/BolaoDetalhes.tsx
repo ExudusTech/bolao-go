@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
-import { GameSuggestions, SuggestedGame } from "@/components/bolao/GameSuggestions";
+import { GameSuggestions, SuggestedGame, GameCriteria } from "@/components/bolao/GameSuggestions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -239,6 +239,58 @@ export default function BolaoDetalhes() {
     }
   };
 
+  const handleRequestCustomSuggestion = async (
+    excludeIds: string[], 
+    alreadySelectedCost: number, 
+    size: number, 
+    criteria: GameCriteria
+  ): Promise<SuggestedGame | null> => {
+    const apostasParaIA = paidApostas.map(a => ({
+      apelido: a.apelido,
+      dezenas: a.dezenas.sort((x, y) => x - y),
+    }));
+
+    const lotteryType = bolao?.tipo_loteria || "megasena";
+    const lotteryConfig = LOTTERY_TYPES[lotteryType as keyof typeof LOTTERY_TYPES];
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/suggest-games`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          totalArrecadado,
+          lotteryConfig,
+          apostas: apostasParaIA,
+          excludeIds,
+          alreadySelectedCost,
+          customRequest: { size, criteria },
+        }),
+      });
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          toast.error("Limite de requisições excedido. Tente novamente em alguns minutos.");
+          return null;
+        }
+        if (response.status === 402) {
+          toast.error("Créditos insuficientes. Entre em contato com o suporte.");
+          return null;
+        }
+        throw new Error("Erro ao gerar sugestão");
+      }
+
+      const data = await response.json();
+      return data.customGame || null;
+    } catch (error) {
+      console.error("Error getting custom suggestion:", error);
+      toast.error("Erro ao gerar sugestão personalizada");
+      return null;
+    }
+  };
+
   const handleSaveGames = async (games: SuggestedGame[]): Promise<boolean> => {
     if (!id || games.length === 0) return false;
 
@@ -442,11 +494,13 @@ export default function BolaoDetalhes() {
                   console.log("Selected games:", selectedGames.length, "Remaining:", remainingBudget);
                 }}
                 onRequestMoreSuggestions={handleRequestMoreSuggestions}
+                onRequestCustomSuggestion={handleRequestCustomSuggestion}
                 onSaveGames={handleSaveGames}
                 isLoadingMore={loadingMoreSuggestions}
                 isSaving={savingGames}
                 minGameCost={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices[7] || 4.50}
                 lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
+                availableSizes={Object.keys(LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices || {}).map(Number).filter(n => n >= 7)}
               />
             )}
 
