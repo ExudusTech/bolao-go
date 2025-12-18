@@ -29,8 +29,8 @@ interface GameSuggestionsProps {
   suggestions: SuggestedGame[];
   analysis: NumberAnalysis;
   onSelectionChange?: (selectedGames: SuggestedGame[], remainingBudget: number) => void;
-  onRequestMoreSuggestions?: (excludeIds: string[], alreadySelectedCost: number) => Promise<SuggestedGame[]>;
-  onRequestCustomSuggestion?: (excludeIds: string[], alreadySelectedCost: number, size: number, criteria: GameCriteria) => Promise<SuggestedGame | null>;
+  onRequestMoreSuggestions?: (excludeIds: string[], alreadySelectedCost: number, existingGameNumbers: number[][]) => Promise<SuggestedGame[]>;
+  onRequestCustomSuggestion?: (excludeIds: string[], alreadySelectedCost: number, size: number, criteria: GameCriteria, existingGameNumbers: number[][]) => Promise<SuggestedGame | null>;
   onSaveGames?: (games: SuggestedGame[]) => Promise<boolean>;
   isLoadingMore?: boolean;
   isSaving?: boolean;
@@ -108,7 +108,8 @@ export function GameSuggestions({
   const handleRequestMore = async () => {
     if (!onRequestMoreSuggestions) return;
     const excludeIds = allSuggestions.map(s => s.id);
-    const newSuggestions = await onRequestMoreSuggestions(excludeIds, selectedCost);
+    const existingGameNumbers = allSuggestions.map(s => s.numbers);
+    const newSuggestions = await onRequestMoreSuggestions(excludeIds, selectedCost, existingGameNumbers);
     if (newSuggestions.length > 0) {
       setAllSuggestions(prev => [...prev, ...newSuggestions]);
     }
@@ -128,7 +129,8 @@ export function GameSuggestions({
     setIsLoadingCustom(true);
     try {
       const excludeIds = allSuggestions.map(s => s.id);
-      const newGame = await onRequestCustomSuggestion(excludeIds, selectedCost, parseInt(customSize), customCriteria);
+      const existingGameNumbers = allSuggestions.map(s => s.numbers);
+      const newGame = await onRequestCustomSuggestion(excludeIds, selectedCost, parseInt(customSize), customCriteria, existingGameNumbers);
       if (newGame) {
         setAllSuggestions(prev => [...prev, newGame]);
         toast.success("Novo jogo sugerido!");
