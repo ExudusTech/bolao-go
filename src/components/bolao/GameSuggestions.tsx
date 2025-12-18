@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, DollarSign, Check, RefreshCw, Loader2, Save, FileText, Copy } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sparkles, DollarSign, Check, RefreshCw, Loader2, Save, FileText, Copy, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 export interface SuggestedGame {
@@ -20,6 +21,8 @@ interface NumberAnalysis {
   notVoted: number[];
 }
 
+export type GameCriteria = "mais_votados" | "menos_votados" | "nao_votados" | "misto";
+
 interface GameSuggestionsProps {
   totalBudget: number;
   individualGamesCost: number;
@@ -27,11 +30,13 @@ interface GameSuggestionsProps {
   analysis: NumberAnalysis;
   onSelectionChange?: (selectedGames: SuggestedGame[], remainingBudget: number) => void;
   onRequestMoreSuggestions?: (excludeIds: string[], alreadySelectedCost: number) => Promise<SuggestedGame[]>;
+  onRequestCustomSuggestion?: (excludeIds: string[], alreadySelectedCost: number, size: number, criteria: GameCriteria) => Promise<SuggestedGame | null>;
   onSaveGames?: (games: SuggestedGame[]) => Promise<boolean>;
   isLoadingMore?: boolean;
   isSaving?: boolean;
   minGameCost?: number;
   lotteryName?: string;
+  availableSizes?: number[];
 }
 
 export function GameSuggestions({
@@ -41,15 +46,21 @@ export function GameSuggestions({
   analysis,
   onSelectionChange,
   onRequestMoreSuggestions,
+  onRequestCustomSuggestion,
   onSaveGames,
   isLoadingMore = false,
   isSaving = false,
   minGameCost = 4.50,
   lotteryName = "Mega-Sena",
+  availableSizes = [7, 8, 9, 10],
 }: GameSuggestionsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [allSuggestions, setAllSuggestions] = useState<SuggestedGame[]>(initialSuggestions);
   const [showSummary, setShowSummary] = useState(false);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customSize, setCustomSize] = useState<string>("");
+  const [customCriteria, setCustomCriteria] = useState<GameCriteria | "">("");
+  const [isLoadingCustom, setIsLoadingCustom] = useState(false);
 
   useMemo(() => {
     const existingIds = new Set(allSuggestions.map(s => s.id));
@@ -107,6 +118,29 @@ export function GameSuggestions({
     const success = await onSaveGames(selectedGames);
     if (success) {
       setShowSummary(true);
+    }
+  };
+
+  const handleCustomSuggestion = async () => {
+    if (!onRequestCustomSuggestion || !customSize || !customCriteria) return;
+    
+    setIsLoadingCustom(true);
+    try {
+      const excludeIds = allSuggestions.map(s => s.id);
+      const newGame = await onRequestCustomSuggestion(excludeIds, selectedCost, parseInt(customSize), customCriteria);
+      if (newGame) {
+        setAllSuggestions(prev => [...prev, newGame]);
+        toast.success("Novo jogo sugerido!");
+      } else {
+        toast.error("Não foi possível gerar um jogo com esses critérios");
+      }
+    } catch (error) {
+      toast.error("Erro ao gerar sugestão");
+    } finally {
+      setIsLoadingCustom(false);
+      setShowCustomForm(false);
+      setCustomSize("");
+      setCustomCriteria("");
     }
   };
 
@@ -362,29 +396,109 @@ export function GameSuggestions({
         </div>
 
         {/* Request More Suggestions */}
-        {canRequestMore && !hasAffordableUnselected && (
-          <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
-            <p className="text-sm text-warning mb-3">
-              Ainda há R$ {remainingBudget.toFixed(2)} de saldo disponível. Deseja mais sugestões?
+        {canRequestMore && (
+          <div className="p-4 rounded-lg bg-warning/10 border border-warning/30 space-y-4">
+            <p className="text-sm text-warning">
+              Ainda há R$ {remainingBudget.toFixed(2)} de saldo disponível.
             </p>
-            <Button 
-              onClick={handleRequestMore} 
-              disabled={isLoadingMore}
-              variant="outline"
-              className="border-warning text-warning hover:bg-warning/10"
-            >
-              {isLoadingMore ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Gerar Mais Sugestões
-                </>
-              )}
-            </Button>
+            
+            {!showCustomForm ? (
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={handleRequestMore} 
+                  disabled={isLoadingMore}
+                  variant="outline"
+                  className="border-warning text-warning hover:bg-warning/10"
+                >
+                  {isLoadingMore ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Sugestões Automáticas
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  onClick={() => setShowCustomForm(true)} 
+                  variant="outline"
+                  className="border-accent text-accent hover:bg-accent/10"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Sugerir Jogo Personalizado
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4 p-4 rounded-lg bg-background border">
+                <h4 className="font-medium">Configurar Jogo Personalizado</h4>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Quantidade de Números</label>
+                    <Select value={customSize} onValueChange={setCustomSize}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSizes.map(size => (
+                          <SelectItem key={size} value={size.toString()}>
+                            {size} dezenas
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm text-muted-foreground">Critério de Seleção</label>
+                    <Select value={customCriteria} onValueChange={(v) => setCustomCriteria(v as GameCriteria)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="mais_votados">🔥 Mais Votados</SelectItem>
+                        <SelectItem value="menos_votados">❄️ Menos Votados</SelectItem>
+                        <SelectItem value="nao_votados">✨ Não Votados</SelectItem>
+                        <SelectItem value="misto">🎲 Misto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleCustomSuggestion}
+                    disabled={!customSize || !customCriteria || isLoadingCustom}
+                    className="flex-1"
+                  >
+                    {isLoadingCustom ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        Gerar Sugestão
+                      </>
+                    )}
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    onClick={() => {
+                      setShowCustomForm(false);
+                      setCustomSize("");
+                      setCustomCriteria("");
+                    }}
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
