@@ -110,9 +110,10 @@ export function MessagesPanel({
   }, [messages]);
 
   async function fetchMessages() {
+    // Only select non-sensitive fields - exclude autor_celular to protect PII
     const { data, error } = await supabase
       .from('mensagens')
-      .select('*')
+      .select('id, bolao_id, autor_nome, autor_gestor_id, conteudo, created_at')
       .eq('bolao_id', bolaoId)
       .order('created_at', { ascending: true });
 
@@ -121,7 +122,11 @@ export function MessagesPanel({
       return;
     }
 
-    const newMessages = data || [];
+    // Map to Message type, setting autor_celular to null since we don't fetch it
+    const newMessages: Message[] = (data || []).map(msg => ({
+      ...msg,
+      autor_celular: null
+    }));
     handleNewMessages(newMessages);
     setMessages(newMessages);
   }
