@@ -5,6 +5,7 @@ import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria } from "@/components/bolao/GameSuggestions";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
+import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -509,8 +510,15 @@ export default function BolaoDetalhes() {
                 minGameCost={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices[7] || 4.50}
                 lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
                 availableSizes={Object.keys(LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices || {}).map(Number).filter(n => n >= 7)}
-              />
+            />
             )}
+
+            {/* Registration Summary - Always Visible */}
+            <RegistrationSummary 
+              bolaoId={bolao.id}
+              lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
+              paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
+            />
 
             {/* Messages Panel */}
             <MessagesPanel bolaoId={bolao.id} isGestor={true} />
