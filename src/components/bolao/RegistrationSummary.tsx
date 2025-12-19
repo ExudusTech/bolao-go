@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { FileText, Copy, Loader2, Ticket, Check } from "lucide-react";
+import { FileText, Copy, Loader2, Ticket, Check, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -108,10 +108,60 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
     setUpdatingId(null);
   };
 
+  const markAllAsRegistered = async () => {
+    const unregisteredGames = savedGames.filter(g => !g.registrado);
+    const unregisteredBets = paidBets.filter(b => !b.registrado);
+    
+    if (unregisteredGames.length === 0 && unregisteredBets.length === 0) {
+      toast.info("Todos os jogos já estão registrados!");
+      return;
+    }
+
+    setUpdatingId("all");
+    const dataRegistro = new Date().toISOString();
+
+    try {
+      // Update games
+      if (unregisteredGames.length > 0) {
+        const gameIds = unregisteredGames.map(g => g.id);
+        const { error: gamesError } = await supabase
+          .from("jogos_selecionados")
+          .update({ registrado: true, data_registro: dataRegistro })
+          .in("id", gameIds);
+
+        if (gamesError) throw gamesError;
+
+        setSavedGames(prev => 
+          prev.map(game => ({ ...game, registrado: true, data_registro: dataRegistro }))
+        );
+      }
+
+      // Update bets
+      if (unregisteredBets.length > 0) {
+        const betIds = unregisteredBets.map(b => b.id);
+        const { error: betsError } = await supabase
+          .from("apostas")
+          .update({ registrado: true, data_registro: dataRegistro })
+          .in("id", betIds);
+
+        if (betsError) throw betsError;
+        onBetRegistrationChange?.();
+      }
+
+      toast.success("Todos os jogos marcados como registrados!");
+    } catch (error) {
+      console.error("Error marking all as registered:", error);
+      toast.error("Erro ao marcar jogos como registrados");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const registeredGamesCount = savedGames.filter(g => g.registrado).length;
   const registeredBetsCount = paidBets.filter(b => b.registrado).length;
   const totalRegisteredCount = registeredGamesCount + registeredBetsCount;
   const totalGamesCount = savedGames.length + paidBets.length;
+  const allRegistered = totalRegisteredCount === totalGamesCount;
   const totalGamesCost = savedGames.reduce((sum, g) => sum + g.custo, 0);
   const individualCost = paidBets.length * 5.00;
   const totalCost = totalGamesCost + individualCost;
@@ -331,11 +381,27 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
           </div>
         )}
 
-        {/* Copy Button */}
-        <Button onClick={handleCopySummary} className="w-full" size="lg">
-          <Copy className="h-4 w-4 mr-2" />
-          Copiar Resumo Completo
-        </Button>
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button 
+            onClick={markAllAsRegistered} 
+            variant={allRegistered ? "secondary" : "default"}
+            disabled={updatingId === "all" || allRegistered}
+            className="flex-1"
+            size="lg"
+          >
+            {updatingId === "all" ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <CheckCheck className="h-4 w-4 mr-2" />
+            )}
+            {allRegistered ? "Todos Registrados" : "Marcar Todos como Registrados"}
+          </Button>
+          <Button onClick={handleCopySummary} variant="outline" className="flex-1" size="lg">
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar Resumo
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
