@@ -137,7 +137,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     }
 
     const fileExt = file.name.split('.').pop();
-    const fileName = `${uploadingBetId}-${Date.now()}.${fileExt}`;
+    // Use crypto.randomUUID for unpredictable filenames to prevent enumeration attacks
+    const fileName = `${crypto.randomUUID()}-${Date.now()}.${fileExt}`;
 
     const { error: uploadError } = await supabase.storage
       .from('receipts')
