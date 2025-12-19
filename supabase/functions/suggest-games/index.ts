@@ -109,9 +109,9 @@ function generateGameSuggestions(
   console.log(`Starting generation with budget R$ ${availableBudget.toFixed(2)}`);
   console.log(`Total voted numbers: ${rankedMostVoted.length}, Not voted: ${analysis.notVoted.length}`);
   
-  // Strategy: Generate games in descending size order (larger games first for better value)
+  // Strategy: Generate games prioritizing variety of categories and sizes
   // Following Caixa rules: 6-20 numbers per game
-  const gameSizes = [20, 19, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6];
+  const gameSizes = [10, 9, 8, 7, 6]; // Focus on practical sizes first
   
   // Track how many games of each category we've created
   let maisVotadosCount = 0;
@@ -119,12 +119,78 @@ function generateGameSuggestions(
   let naoVotadosCount = 0;
   let mistoCount = 0;
   
-  // Keep trying to add games while we have budget
-  let keepGenerating = true;
-  const maxIterations = 100;
-  let iterations = 0;
+  // First, ensure we generate one game of each size for mais_votados (priority)
+  // Then menos_votados, then others
+  const priorityCategories = ['mais_votados', 'menos_votados'];
   
-  while (keepGenerating && iterations < maxIterations) {
+  for (const catName of priorityCategories) {
+    for (const size of gameSizes) {
+      const price = lotteryConfig.prices[size];
+      if (!price || price > remainingBudget) continue;
+      
+      let numbers: number[] | null = null;
+      let reason = '';
+      
+      if (catName === 'mais_votados') {
+        const availableNumbers = rankedMostVoted
+          .filter(e => !state.usedNumbersByCategory.mais_votados.has(e.number))
+          .slice(0, size)
+          .map(e => e.number);
+        
+        if (availableNumbers.length >= size) {
+          numbers = availableNumbers.slice(0, size);
+          maisVotadosCount++;
+          const start = state.usedNumbersByCategory.mais_votados.size + 1;
+          const end = start + size - 1;
+          reason = `Jogo ${maisVotadosCount} com ${size} números MAIS VOTADOS (ranking ${start}º ao ${end}º)`;
+        }
+      } else if (catName === 'menos_votados') {
+        const availableNumbers = rankedLeastVoted
+          .filter(e => !state.usedNumbersByCategory.menos_votados.has(e.number))
+          .slice(0, size)
+          .map(e => e.number);
+        
+        if (availableNumbers.length >= size) {
+          numbers = availableNumbers.slice(0, size);
+          menosVotadosCount++;
+          const start = state.usedNumbersByCategory.menos_votados.size + 1;
+          const end = start + size - 1;
+          reason = `Jogo ${menosVotadosCount} com ${size} números MENOS VOTADOS (ranking ${start}º ao ${end}º)`;
+        }
+      }
+      
+      if (numbers && numbers.length === size) {
+        const sortedNumbers = [...numbers].sort((a, b) => a - b);
+        const gameKey = sortedNumbers.join(',');
+        
+        if (!state.existingGames.has(gameKey)) {
+          numbers.forEach(n => state.usedNumbersByCategory[catName].add(n));
+          state.existingGames.add(gameKey);
+          
+          suggestions.push({
+            id: `suggestion-${state.gameIndex}`,
+            numbers: sortedNumbers,
+            cost: price,
+            type: `${size} dezenas`,
+            reason,
+            categoria: catName,
+          });
+          
+          remainingBudget -= price;
+          state.gameIndex++;
+          
+          console.log(`Added ${catName} game: ${size} numbers, R$ ${price.toFixed(2)}, remaining: R$ ${remainingBudget.toFixed(2)}`);
+        }
+      }
+    }
+  }
+  
+  // Now generate remaining games with available budget
+  const maxIterations = 50;
+  let iterations = 0;
+  let keepGenerating = true;
+  
+  while (keepGenerating && iterations < maxIterations && remainingBudget >= lotteryConfig.prices[6]) {
     iterations++;
     keepGenerating = false;
     
@@ -132,7 +198,6 @@ function generateGameSuggestions(
       const price = lotteryConfig.prices[size];
       if (!price || price > remainingBudget) continue;
       
-      // Try each category
       const categories = [
         { name: 'mais_votados', label: 'MAIS VOTADOS' },
         { name: 'menos_votados', label: 'MENOS VOTADOS' },
