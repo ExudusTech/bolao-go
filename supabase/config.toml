@@ -1,1 +1,7 @@
 project_id = "wfvnhtopemznsqsraiyi"
+
+[functions.suggest-games]
+verify_jwt = true
+
+[functions.check-lottery-results]
+verify_jwt = true
