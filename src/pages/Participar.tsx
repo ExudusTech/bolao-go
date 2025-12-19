@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
+import { ClosedBolaoMessage } from "@/components/bolao/ClosedBolaoMessage";
 import { BetForm } from "@/components/bolao/BetForm";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,9 @@ interface Bolao {
   observacoes: string | null;
   total_apostas: number;
   gestor_name: string | null;
+  encerrado: boolean;
+  numeros_sorteados: number[] | null;
+  resultado_verificado: boolean;
 }
 
 export default function Participar() {
@@ -33,7 +37,12 @@ export default function Participar() {
 
     if (!error && data && data.length > 0) {
       const bolaoData = data[0];
-      setBolao(bolaoData);
+      setBolao({
+        ...bolaoData,
+        encerrado: bolaoData.encerrado ?? false,
+        numeros_sorteados: bolaoData.numeros_sorteados ?? null,
+        resultado_verificado: bolaoData.resultado_verificado ?? false,
+      });
       setCounter(bolaoData.total_apostas);
     }
     setLoading(false);
@@ -81,11 +90,60 @@ export default function Participar() {
     );
   }
 
+  // Show closed message if bolão is encerrado
+  if (bolao.encerrado) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur">
+          <div className="container flex h-14 items-center justify-between px-4">
+            <Link to="/" className="flex items-center gap-2 hover-scale">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+                <span className="text-sm font-bold text-primary-foreground">R</span>
+              </div>
+              <span className="font-bold text-foreground">Robolão</span>
+            </Link>
+          </div>
+        </header>
+
+        {/* Closed Message */}
+        <main className="container py-8 px-4 flex flex-col items-center">
+          <ClosedBolaoMessage
+            bolaoNome={bolao.nome_do_bolao}
+            resultadoVerificado={bolao.resultado_verificado}
+            numerosSorteados={bolao.numeros_sorteados}
+            isPrized={false} // TODO: Calculate if prized based on bets
+          />
+
+          {/* Messages Panel - still visible */}
+          <div className="w-full max-w-md mt-8">
+            <MessagesPanel 
+              bolaoId={bolao.id} 
+              isGestor={false}
+              participanteName={participanteName}
+              participanteCelular={participanteCelular}
+            />
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="border-t py-6 mt-8">
+          <div className="container text-center text-sm text-muted-foreground">
+            Powered by{" "}
+            <Link to="/" className="font-medium text-primary hover:underline">
+              Robolão
+            </Link>
+          </div>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-card/95 backdrop-blur">
-        <div className="container flex h-14 items-center justify-between">
+        <div className="container flex h-14 items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2 hover-scale">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <span className="text-sm font-bold text-primary-foreground">R</span>
@@ -96,7 +154,7 @@ export default function Participar() {
       </header>
 
       {/* Main Content */}
-      <main className="container py-8 px-4">
+      <main className="container py-6 px-4">
         <div className="flex flex-col items-center gap-6">
           {/* Counter Badge */}
           <Badge 

@@ -248,10 +248,13 @@ export type Database = {
         Returns: {
           chave_pix: string
           created_at: string
+          encerrado: boolean
           gestor_name: string
           id: string
           nome_do_bolao: string
+          numeros_sorteados: number[]
           observacoes: string
+          resultado_verificado: boolean
           total_apostas: number
         }[]
       }
