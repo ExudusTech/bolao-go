@@ -6,6 +6,7 @@ import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria } from "@/components/bolao/GameSuggestions";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
+import { LotteryResultsChecker } from "@/components/bolao/LotteryResultsChecker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +24,9 @@ interface Bolao {
   valor_cota: number;
   tipo_loteria: string;
   created_at: string;
+  numero_concurso: number | null;
+  numeros_sorteados: number[] | null;
+  resultado_verificado: boolean | null;
 }
 
 interface Aposta {
@@ -527,6 +531,16 @@ export default function BolaoDetalhes() {
                 data_registro: a.data_registro
               }))}
               onBetRegistrationChange={fetchData}
+            />
+
+            {/* Lottery Results Checker */}
+            <LotteryResultsChecker
+              bolaoId={bolao.id}
+              lotteryType={bolao.tipo_loteria}
+              savedNumeroConcurso={bolao.numero_concurso}
+              savedNumerosSorteados={bolao.numeros_sorteados}
+              savedResultadoVerificado={bolao.resultado_verificado || false}
+              paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
             />
 
             {/* Messages Panel */}
