@@ -33,6 +33,8 @@ interface Aposta {
   created_at: string;
   payment_status: string;
   receipt_url: string | null;
+  registrado: boolean;
+  data_registro: string | null;
 }
 
 interface NumberAnalysis {
@@ -517,7 +519,14 @@ export default function BolaoDetalhes() {
             <RegistrationSummary 
               bolaoId={bolao.id}
               lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
-              paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
+              paidBets={paidApostas.map(a => ({ 
+                id: a.id, 
+                apelido: a.apelido, 
+                dezenas: a.dezenas,
+                registrado: a.registrado,
+                data_registro: a.data_registro
+              }))}
+              onBetRegistrationChange={fetchData}
             />
 
             {/* Messages Panel */}

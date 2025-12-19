@@ -20,36 +20,42 @@ export type Database = {
           bolao_id: string
           celular: string
           created_at: string
+          data_registro: string | null
           dezenas: number[]
           id: string
           paid_at: string | null
           paid_marked_by: string | null
           payment_status: string
           receipt_url: string | null
+          registrado: boolean
         }
         Insert: {
           apelido: string
           bolao_id: string
           celular: string
           created_at?: string
+          data_registro?: string | null
           dezenas: number[]
           id?: string
           paid_at?: string | null
           paid_marked_by?: string | null
           payment_status?: string
           receipt_url?: string | null
+          registrado?: boolean
         }
         Update: {
           apelido?: string
           bolao_id?: string
           celular?: string
           created_at?: string
+          data_registro?: string | null
           dezenas?: number[]
           id?: string
           paid_at?: string | null
           paid_marked_by?: string | null
           payment_status?: string
           receipt_url?: string | null
+          registrado?: boolean
         }
         Relationships: [
           {

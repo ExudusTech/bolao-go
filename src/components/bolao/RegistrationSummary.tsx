@@ -24,15 +24,18 @@ interface IndividualBet {
   id: string;
   apelido: string;
   dezenas: number[];
+  registrado: boolean;
+  data_registro: string | null;
 }
 
 interface RegistrationSummaryProps {
   bolaoId: string;
   lotteryName: string;
   paidBets: IndividualBet[];
+  onBetRegistrationChange?: () => void;
 }
 
-export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: RegistrationSummaryProps) {
+export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegistrationChange }: RegistrationSummaryProps) {
   const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -55,7 +58,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
     setLoading(false);
   };
 
-  const toggleRegistrado = async (gameId: string, currentStatus: boolean) => {
+  const toggleGameRegistrado = async (gameId: string, currentStatus: boolean) => {
     setUpdatingId(gameId);
     const newStatus = !currentStatus;
     const dataRegistro = newStatus ? new Date().toISOString() : null;
@@ -83,7 +86,31 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
     setUpdatingId(null);
   };
 
-  const registeredCount = savedGames.filter(g => g.registrado).length;
+  const toggleBetRegistrado = async (betId: string, currentStatus: boolean) => {
+    setUpdatingId(betId);
+    const newStatus = !currentStatus;
+    const dataRegistro = newStatus ? new Date().toISOString() : null;
+
+    const { error } = await supabase
+      .from("apostas")
+      .update({ 
+        registrado: newStatus, 
+        data_registro: dataRegistro 
+      })
+      .eq("id", betId);
+
+    if (error) {
+      toast.error("Erro ao atualizar status da aposta");
+    } else {
+      toast.success(newStatus ? "Aposta marcada como registrada!" : "Registro removido");
+      onBetRegistrationChange?.();
+    }
+    setUpdatingId(null);
+  };
+
+  const registeredGamesCount = savedGames.filter(g => g.registrado).length;
+  const registeredBetsCount = paidBets.filter(b => b.registrado).length;
+  const totalRegisteredCount = registeredGamesCount + registeredBetsCount;
   const totalGamesCount = savedGames.length + paidBets.length;
   const totalGamesCost = savedGames.reduce((sum, g) => sum + g.custo, 0);
   const individualCost = paidBets.length * 5.00;
@@ -175,7 +202,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
           </div>
           <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-center">
             <p className="text-xs text-muted-foreground">Registrados</p>
-            <p className="text-lg font-bold text-primary">{registeredCount}/{savedGames.length}</p>
+            <p className="text-lg font-bold text-primary">{totalRegisteredCount}/{totalGamesCount}</p>
           </div>
         </div>
 
@@ -202,7 +229,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
                         id={`game-${game.id}`}
                         checked={game.registrado}
                         disabled={updatingId === game.id}
-                        onCheckedChange={() => toggleRegistrado(game.id, game.registrado)}
+                        onCheckedChange={() => toggleGameRegistrado(game.id, game.registrado)}
                         className="h-5 w-5"
                       />
                       <div className="flex items-center gap-2">
@@ -253,16 +280,46 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
             </h4>
             <div className="space-y-2">
               {paidBets.map((bet) => (
-                <div key={bet.id} className="p-4 rounded-lg bg-accent/5 border border-accent/20">
+                <div 
+                  key={bet.id} 
+                  className={`p-4 rounded-lg border transition-colors ${
+                    bet.registrado 
+                      ? "bg-success/10 border-success/30" 
+                      : "bg-accent/5 border-accent/20"
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-2">
-                    <Badge variant="secondary">{bet.apelido}</Badge>
-                    <span className="text-sm text-muted-foreground">6 dezenas</span>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id={`bet-${bet.id}`}
+                        checked={bet.registrado}
+                        disabled={updatingId === bet.id}
+                        onCheckedChange={() => toggleBetRegistrado(bet.id, bet.registrado)}
+                        className="h-5 w-5"
+                      />
+                      <Badge variant={bet.registrado ? "default" : "secondary"}>
+                        {bet.registrado && <Check className="h-3 w-3 mr-1" />}
+                        {bet.apelido}
+                      </Badge>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm text-muted-foreground">6 dezenas</span>
+                      {bet.registrado && bet.data_registro && (
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(bet.data_registro), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {bet.dezenas.sort((a, b) => a - b).map((num) => (
                       <span
                         key={num}
-                        className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-accent text-accent-foreground text-sm font-bold"
+                        className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${
+                          bet.registrado 
+                            ? "bg-success text-success-foreground" 
+                            : "bg-accent text-accent-foreground"
+                        }`}
                       >
                         {num.toString().padStart(2, "0")}
                       </span>
