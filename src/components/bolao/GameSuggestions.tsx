@@ -50,9 +50,9 @@ export function GameSuggestions({
   onSaveGames,
   isLoadingMore = false,
   isSaving = false,
-  minGameCost = 4.50,
+  minGameCost = 5.00,
   lotteryName = "Mega-Sena",
-  availableSizes = [7, 8, 9, 10],
+  availableSizes = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
 }: GameSuggestionsProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [allSuggestions, setAllSuggestions] = useState<SuggestedGame[]>(initialSuggestions);
