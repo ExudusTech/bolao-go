@@ -36,8 +36,34 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Get and validate user authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Não autorizado" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Validate user token using anon client
+    const anonSupabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await anonSupabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error("Auth error:", authError?.message);
+      return new Response(
+        JSON.stringify({ error: "Sessão inválida ou expirada" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Authenticated user: ${user.id}`);
 
     const { bolaoId, numeroConcurso } = await req.json();
 
@@ -48,7 +74,33 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Buscando resultado do concurso ${numeroConcurso} para bolão ${bolaoId}`);
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify user owns this bolao
+    const { data: bolao, error: bolaoError } = await supabase
+      .from("boloes")
+      .select("gestor_id")
+      .eq("id", bolaoId)
+      .single();
+
+    if (bolaoError || !bolao) {
+      console.error("Bolao not found:", bolaoError?.message);
+      return new Response(
+        JSON.stringify({ error: "Bolão não encontrado" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (bolao.gestor_id !== user.id) {
+      console.error(`User ${user.id} is not the owner of bolao ${bolaoId} (owner: ${bolao.gestor_id})`);
+      return new Response(
+        JSON.stringify({ error: "Acesso negado - você não é o gestor deste bolão" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Buscando resultado do concurso ${numeroConcurso} para bolão ${bolaoId} (gestor: ${user.id})`);
 
     // Fetch lottery result - try multiple APIs
     let lotteryResult: CaixaLotteryResult | null = null;
