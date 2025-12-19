@@ -76,6 +76,18 @@ interface GenerationState {
   gameIndex: number;
 }
 
+interface SkippedGame {
+  size: number;
+  categoria: string;
+  price: number;
+  reason: string;
+}
+
+interface GenerationResult {
+  suggestions: SuggestedGame[];
+  skippedGames: SkippedGame[];
+}
+
 // Generate optimal game suggestions following the user's strategy
 function generateGameSuggestions(
   availableBudget: number,
@@ -83,8 +95,9 @@ function generateGameSuggestions(
   lotteryConfig: LotteryConfig,
   existingNumbers: Set<string>,
   excludeIds: string[] = []
-): SuggestedGame[] {
+): GenerationResult {
   const suggestions: SuggestedGame[] = [];
+  const skippedGames: SkippedGame[] = [];
   let remainingBudget = availableBudget;
   
   // Initialize generation state
@@ -126,32 +139,50 @@ function generateGameSuggestions(
   for (const catName of priorityCategories) {
     for (const size of gameSizes) {
       const price = lotteryConfig.prices[size];
-      if (!price || price > remainingBudget) continue;
+      if (!price) continue;
+      
+      // Check if budget is insufficient for this size
+      if (price > remainingBudget) {
+        // Only add to skipped if we haven't already skipped this combination
+        const alreadySkipped = skippedGames.some(
+          s => s.size === size && s.categoria === catName
+        );
+        if (!alreadySkipped) {
+          skippedGames.push({
+            size,
+            categoria: catName,
+            price,
+            reason: `Orçamento insuficiente (precisa R$ ${price.toFixed(2)}, disponível R$ ${remainingBudget.toFixed(2)})`,
+          });
+          console.log(`Skipped ${catName} game: ${size} numbers, R$ ${price.toFixed(2)} > available R$ ${remainingBudget.toFixed(2)}`);
+        }
+        continue;
+      }
       
       let numbers: number[] | null = null;
       let reason = '';
       
       if (catName === 'mais_votados') {
-        const availableNumbers = rankedMostVoted
-          .filter(e => !state.usedNumbersByCategory.mais_votados.has(e.number))
-          .slice(0, size)
+        // Get exactly the top N numbers from the ranking
+        const topNumbers = rankedMostVoted
+          .slice(state.usedNumbersByCategory.mais_votados.size, state.usedNumbersByCategory.mais_votados.size + size)
           .map(e => e.number);
         
-        if (availableNumbers.length >= size) {
-          numbers = availableNumbers.slice(0, size);
+        if (topNumbers.length >= size) {
+          numbers = topNumbers.slice(0, size);
           maisVotadosCount++;
           const start = state.usedNumbersByCategory.mais_votados.size + 1;
           const end = start + size - 1;
           reason = `Jogo ${maisVotadosCount} com ${size} números MAIS VOTADOS (ranking ${start}º ao ${end}º)`;
         }
       } else if (catName === 'menos_votados') {
-        const availableNumbers = rankedLeastVoted
-          .filter(e => !state.usedNumbersByCategory.menos_votados.has(e.number))
-          .slice(0, size)
+        // Get numbers from the least voted ranking
+        const leastNumbers = rankedLeastVoted
+          .slice(state.usedNumbersByCategory.menos_votados.size, state.usedNumbersByCategory.menos_votados.size + size)
           .map(e => e.number);
         
-        if (availableNumbers.length >= size) {
-          numbers = availableNumbers.slice(0, size);
+        if (leastNumbers.length >= size) {
+          numbers = leastNumbers.slice(0, size);
           menosVotadosCount++;
           const start = state.usedNumbersByCategory.menos_votados.size + 1;
           const end = start + size - 1;
@@ -212,30 +243,30 @@ function generateGameSuggestions(
         let reason = '';
         
         if (cat.name === 'mais_votados') {
-          // Get next available numbers from most voted ranking
+          // Get next available numbers from most voted ranking (sequential from ranking)
+          const startIdx = state.usedNumbersByCategory.mais_votados.size;
           const availableNumbers = rankedMostVoted
-            .filter(e => !state.usedNumbersByCategory.mais_votados.has(e.number))
-            .slice(0, size)
+            .slice(startIdx, startIdx + size)
             .map(e => e.number);
           
           if (availableNumbers.length >= size) {
             numbers = availableNumbers.slice(0, size);
             maisVotadosCount++;
-            const start = state.usedNumbersByCategory.mais_votados.size + 1;
+            const start = startIdx + 1;
             const end = start + size - 1;
             reason = `Jogo ${maisVotadosCount} com ${size} números MAIS VOTADOS (ranking ${start}º ao ${end}º)`;
           }
         } else if (cat.name === 'menos_votados') {
           // Get next available numbers from least voted ranking
+          const startIdx = state.usedNumbersByCategory.menos_votados.size;
           const availableNumbers = rankedLeastVoted
-            .filter(e => !state.usedNumbersByCategory.menos_votados.has(e.number))
-            .slice(0, size)
+            .slice(startIdx, startIdx + size)
             .map(e => e.number);
           
           if (availableNumbers.length >= size) {
             numbers = availableNumbers.slice(0, size);
             menosVotadosCount++;
-            const start = state.usedNumbersByCategory.menos_votados.size + 1;
+            const start = startIdx + 1;
             const end = start + size - 1;
             reason = `Jogo ${menosVotadosCount} com ${size} números MENOS VOTADOS (ranking ${start}º ao ${end}º)`;
           }
@@ -314,8 +345,9 @@ function generateGameSuggestions(
   });
   
   console.log(`Generated ${suggestions.length} suggestions, total cost: R$ ${(availableBudget - remainingBudget).toFixed(2)}`);
+  console.log(`Skipped ${skippedGames.length} games due to budget constraints`);
   
-  return suggestions;
+  return { suggestions, skippedGames };
 }
 
 // Generate a custom game with specific criteria
@@ -517,7 +549,7 @@ serve(async (req) => {
     }
     
     // Regular suggestions generation
-    const suggestions = generateGameSuggestions(
+    const { suggestions, skippedGames } = generateGameSuggestions(
       availableBudget,
       analysis,
       lotteryConfig,
@@ -525,7 +557,7 @@ serve(async (req) => {
       excludeIds
     );
     
-    console.log(`Generated ${suggestions.length} game suggestions`);
+    console.log(`Generated ${suggestions.length} game suggestions, ${skippedGames.length} skipped`);
 
     return new Response(
       JSON.stringify({
@@ -535,6 +567,7 @@ serve(async (req) => {
           notVoted: analysis.notVoted,
         },
         suggestions,
+        skippedGames,
         individualGamesCost,
         availableBudget: totalArrecadado - individualGamesCost,
       }),

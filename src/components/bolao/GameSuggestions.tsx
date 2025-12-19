@@ -21,6 +21,13 @@ interface NumberAnalysis {
   notVoted: number[];
 }
 
+export interface SkippedGame {
+  size: number;
+  categoria: string;
+  price: number;
+  reason: string;
+}
+
 export type GameCriteria = "mais_votados" | "menos_votados" | "nao_votados" | "misto";
 
 interface GameSuggestionsProps {
@@ -28,6 +35,7 @@ interface GameSuggestionsProps {
   individualGamesCost: number;
   suggestions: SuggestedGame[];
   analysis: NumberAnalysis;
+  skippedGames?: SkippedGame[];
   onSelectionChange?: (selectedGames: SuggestedGame[], remainingBudget: number) => void;
   onRequestMoreSuggestions?: (excludeIds: string[], alreadySelectedCost: number, existingGameNumbers: number[][]) => Promise<SuggestedGame[]>;
   onRequestCustomSuggestion?: (excludeIds: string[], alreadySelectedCost: number, size: number, criteria: GameCriteria, existingGameNumbers: number[][]) => Promise<SuggestedGame | null>;
@@ -44,6 +52,7 @@ export function GameSuggestions({
   individualGamesCost,
   suggestions: initialSuggestions,
   analysis,
+  skippedGames = [],
   onSelectionChange,
   onRequestMoreSuggestions,
   onRequestCustomSuggestion,
@@ -508,6 +517,29 @@ export function GameSuggestions({
             })}
           </div>
         </div>
+
+        {/* Skipped Games due to budget constraints */}
+        {skippedGames.length > 0 && (
+          <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20 space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-destructive">⚠️ Jogos não gerados por falta de orçamento</span>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              {skippedGames.map((skipped, index) => (
+                <div key={index} className="p-3 rounded-lg bg-background border text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{skipped.size} dezenas - {skipped.categoria === 'mais_votados' ? 'Mais Votados' : 'Menos Votados'}</span>
+                    <span className="text-destructive font-bold">R$ {skipped.price.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">{skipped.reason}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              💡 Dica: Para gerar jogos maiores, aumente a arrecadação ou o valor da cota.
+            </p>
+          </div>
+        )}
 
         {/* Request More Suggestions */}
         {canRequestMore && (

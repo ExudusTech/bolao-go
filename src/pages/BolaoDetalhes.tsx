@@ -3,7 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
-import { GameSuggestions, SuggestedGame, GameCriteria } from "@/components/bolao/GameSuggestions";
+import { GameSuggestions, SuggestedGame, GameCriteria, SkippedGame } from "@/components/bolao/GameSuggestions";
 import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
@@ -51,6 +51,7 @@ interface NumberAnalysis {
 interface SuggestionsData {
   analysis: NumberAnalysis;
   suggestions: SuggestedGame[];
+  skippedGames?: SkippedGame[];
   individualGamesCost: number;
   availableBudget: number;
 }
@@ -514,6 +515,7 @@ export default function BolaoDetalhes() {
                 individualGamesCost={suggestionsData.individualGamesCost}
                 suggestions={suggestionsData.suggestions}
                 analysis={suggestionsData.analysis}
+                skippedGames={suggestionsData.skippedGames || []}
                 onSelectionChange={(selectedGames, remainingBudget) => {
                   console.log("Selected games:", selectedGames.length, "Remaining:", remainingBudget);
                 }}
