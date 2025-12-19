@@ -72,6 +72,7 @@ export type Database = {
           chave_pix: string
           created_at: string
           data_sorteio: string | null
+          encerrado: boolean
           gestor_id: string
           id: string
           nome_do_bolao: string
@@ -89,6 +90,7 @@ export type Database = {
           chave_pix: string
           created_at?: string
           data_sorteio?: string | null
+          encerrado?: boolean
           gestor_id: string
           id?: string
           nome_do_bolao: string
@@ -106,6 +108,7 @@ export type Database = {
           chave_pix?: string
           created_at?: string
           data_sorteio?: string | null
+          encerrado?: boolean
           gestor_id?: string
           id?: string
           nome_do_bolao?: string
