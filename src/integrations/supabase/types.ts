@@ -258,6 +258,10 @@ export type Database = {
           total_apostas: number
         }[]
       }
+      is_bolao_participant: {
+        Args: { p_bolao_id: string; p_celular: string }
+        Returns: boolean
+      }
       upload_receipt: {
         Args: { p_aposta_id: string; p_celular: string; p_receipt_url: string }
         Returns: boolean
