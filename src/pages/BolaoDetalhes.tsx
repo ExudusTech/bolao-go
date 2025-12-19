@@ -9,12 +9,14 @@ import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis"
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
 import { LotteryResultsChecker } from "@/components/bolao/LotteryResultsChecker";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket } from "lucide-react";
+import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, MessageSquare, Table } from "lucide-react";
 import { LOTTERY_TYPES } from "@/lib/validations";
 
 interface Bolao {
@@ -29,6 +31,7 @@ interface Bolao {
   numero_concurso: number | null;
   numeros_sorteados: number[] | null;
   resultado_verificado: boolean | null;
+  encerrado: boolean;
 }
 
 interface Aposta {
@@ -75,6 +78,7 @@ export default function BolaoDetalhes() {
   const [savingGames, setSavingGames] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<SuggestionsData | null>(null);
   const [showSelectionDialog, setShowSelectionDialog] = useState(false);
+  const [togglingEncerrado, setTogglingEncerrado] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -85,7 +89,10 @@ export default function BolaoDetalhes() {
     ]);
 
     if (!bolaoRes.error && bolaoRes.data) {
-      setBolao(bolaoRes.data);
+      setBolao({
+        ...bolaoRes.data,
+        encerrado: bolaoRes.data.encerrado ?? false,
+      });
     }
 
     if (!apostasRes.error && apostasRes.data) {
@@ -117,6 +124,27 @@ export default function BolaoDetalhes() {
     } catch {
       toast.error("Erro ao copiar link");
     }
+  };
+
+  const handleToggleEncerrado = async () => {
+    if (!bolao) return;
+    
+    setTogglingEncerrado(true);
+    const newStatus = !bolao.encerrado;
+    
+    const { error } = await supabase
+      .from("boloes")
+      .update({ encerrado: newStatus })
+      .eq("id", bolao.id);
+    
+    if (error) {
+      toast.error("Erro ao alterar status do bolão");
+    } else {
+      setBolao({ ...bolao, encerrado: newStatus });
+      toast.success(newStatus ? "Bolão encerrado! Novas apostas estão bloqueadas." : "Bolão reaberto para apostas!");
+    }
+    
+    setTogglingEncerrado(false);
   };
 
   const handleExportCSV = () => {
@@ -406,8 +434,8 @@ export default function BolaoDetalhes() {
     <AuthGuard>
       <div className="min-h-screen bg-background">
         <Header />
-        <main className="container py-8 px-4">
-          <div className="space-y-6">
+        <main className="container py-6 px-4 sm:py-8">
+          <div className="space-y-4 sm:space-y-6">
             {/* Back Button */}
             <Button variant="ghost" size="sm" asChild>
               <Link to="/gestor/dashboard">
@@ -418,40 +446,51 @@ export default function BolaoDetalhes() {
 
             {/* Bolao Info Card */}
             <Card className="animate-fade-in">
-              <CardHeader>
+              <CardHeader className="pb-4">
+                <div className="flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-2xl">{bolao.nome_do_bolao}</CardTitle>
-                    <CardDescription className="flex items-center gap-2">
-                      <Ticket className="h-4 w-4" />
-                      {LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || bolao.tipo_loteria} • Criado em {new Date(bolao.created_at).toLocaleDateString("pt-BR")}
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" className="flex items-center gap-2 text-lg px-4 py-2 bg-primary/10 text-primary">
-                      <Users className="h-5 w-5" />
-                      <span className="font-bold">{bolao.total_apostas}</span>
-                      <span className="text-sm font-normal">apostas</span>
-                    </Badge>
-                    <Badge variant="secondary" className="flex items-center gap-2 text-lg px-4 py-2 bg-success/10 text-success">
-                      <DollarSign className="h-5 w-5" />
-                      <span className="font-bold">R$ {totalArrecadado.toFixed(2)}</span>
-                      <span className="text-sm font-normal">arrecadado</span>
-                    </Badge>
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <CardTitle className="text-xl sm:text-2xl">{bolao.nome_do_bolao}</CardTitle>
+                        {bolao.encerrado && (
+                          <Badge variant="destructive" className="shrink-0">
+                            <Lock className="h-3 w-3 mr-1" />
+                            Encerrado
+                          </Badge>
+                        )}
+                      </div>
+                      <CardDescription className="flex items-center gap-2 flex-wrap">
+                        <Ticket className="h-4 w-4 shrink-0" />
+                        <span>{LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || bolao.tipo_loteria}</span>
+                        <span>•</span>
+                        <span>Criado em {new Date(bolao.created_at).toLocaleDateString("pt-BR")}</span>
+                      </CardDescription>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="flex items-center gap-2 text-base sm:text-lg px-3 sm:px-4 py-2 bg-primary/10 text-primary">
+                        <Users className="h-4 sm:h-5 w-4 sm:w-5" />
+                        <span className="font-bold">{bolao.total_apostas}</span>
+                        <span className="text-xs sm:text-sm font-normal">apostas</span>
+                      </Badge>
+                      <Badge variant="secondary" className="flex items-center gap-2 text-base sm:text-lg px-3 sm:px-4 py-2 bg-success/10 text-success">
+                        <DollarSign className="h-4 sm:h-5 w-4 sm:w-5" />
+                        <span className="font-bold">R$ {totalArrecadado.toFixed(2)}</span>
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-3">
                   <div className="flex items-start gap-2">
-                    <Key className="h-4 w-4 mt-1 text-muted-foreground" />
-                    <div>
+                    <Key className="h-4 w-4 mt-1 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
                       <p className="text-sm font-medium">Chave PIX</p>
-                      <p className="text-muted-foreground">{bolao.chave_pix}</p>
+                      <p className="text-muted-foreground truncate">{bolao.chave_pix}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <DollarSign className="h-4 w-4 mt-1 text-muted-foreground" />
+                    <DollarSign className="h-4 w-4 mt-1 text-muted-foreground shrink-0" />
                     <div>
                       <p className="text-sm font-medium">Valor da Cota</p>
                       <p className="text-muted-foreground">R$ {bolao.valor_cota.toFixed(2)}</p>
@@ -459,66 +498,115 @@ export default function BolaoDetalhes() {
                   </div>
                   {bolao.observacoes && (
                     <div className="flex items-start gap-2">
-                      <FileText className="h-4 w-4 mt-1 text-muted-foreground" />
-                      <div>
+                      <FileText className="h-4 w-4 mt-1 text-muted-foreground shrink-0" />
+                      <div className="min-w-0">
                         <p className="text-sm font-medium">Observações</p>
-                        <p className="text-muted-foreground">{bolao.observacoes}</p>
+                        <p className="text-muted-foreground text-sm">{bolao.observacoes}</p>
                       </div>
                     </div>
                   )}
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted/50 border">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium">Resumo de Pagamentos</p>
                       <p className="text-muted-foreground text-sm">
                         {paidApostas.length} de {apostas.length} apostas pagas
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-success">R$ {totalArrecadado.toFixed(2)}</p>
+                    <div className="text-left sm:text-right">
+                      <p className="text-xl sm:text-2xl font-bold text-success">R$ {totalArrecadado.toFixed(2)}</p>
                       <p className="text-xs text-muted-foreground">Total arrecadado</p>
                     </div>
                   </div>
                 </div>
 
+                {/* Action Buttons */}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Button variant="outline" size="sm" onClick={handleCopyLink} className="hover-scale">
+                  <Button variant="outline" size="sm" onClick={handleCopyLink} className="flex-1 sm:flex-none">
                     <Copy className="h-4 w-4 mr-2" />
-                    Copiar Link
+                    <span className="hidden sm:inline">Copiar </span>Link
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="hover-scale">
+                  <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="flex-1 sm:flex-none">
                     <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-                    Atualizar Lista
+                    <span className="hidden sm:inline">Atualizar</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={exporting || paidApostas.length === 0} className="hover-scale">
+                  <Button variant="outline" size="sm" onClick={handleExportCSV} disabled={exporting || paidApostas.length === 0} className="flex-1 sm:flex-none">
                     <Download className={`h-4 w-4 mr-2 ${exporting ? "animate-spin" : ""}`} />
-                    Exportar CSV
+                    CSV
                   </Button>
                   <Button 
                     size="sm" 
                     onClick={handleOpenSelectionDialog} 
                     disabled={loadingSuggestions || paidApostas.length === 0}
-                    className="hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
+                    className="flex-1 sm:flex-none bg-accent text-accent-foreground hover:bg-accent/90"
                   >
                     {loadingSuggestions ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
-                    Sugerir Jogos com IA
+                    <span className="hidden sm:inline">Sugerir Jogos com </span>IA
                   </Button>
+                  
+                  {/* Encerrar/Reabrir Bolão */}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        size="sm" 
+                        variant={bolao.encerrado ? "outline" : "destructive"}
+                        disabled={togglingEncerrado}
+                        className="flex-1 sm:flex-none"
+                      >
+                        {togglingEncerrado ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : bolao.encerrado ? (
+                          <LockOpen className="h-4 w-4 mr-2" />
+                        ) : (
+                          <Lock className="h-4 w-4 mr-2" />
+                        )}
+                        {bolao.encerrado ? "Reabrir" : "Encerrar"}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          {bolao.encerrado ? "Reabrir bolão?" : "Encerrar bolão?"}
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {bolao.encerrado 
+                            ? "Ao reabrir, novas apostas poderão ser feitas através do link de participação."
+                            : "Ao encerrar, o link de participação não permitirá mais novas apostas. Os participantes verão uma mensagem indicando que o bolão está fechado."
+                          }
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleToggleEncerrado}>
+                          {bolao.encerrado ? "Sim, reabrir" : "Sim, encerrar"}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Number Ranking Analysis - Always Visible when there are paid bets */}
+            {/* Number Ranking Analysis - Collapsible */}
             {paidApostas.length > 0 && (
-              <NumberRankingAnalysis 
-                apostas={paidApostas.map(a => ({ dezenas: a.dezenas }))}
-                maxNumber={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.numberRange || 60}
-              />
+              <CollapsibleSection
+                title="Análise dos Números"
+                description={`Ranking baseado em ${paidApostas.length} apostas pagas`}
+                icon={<BarChart3 className="h-5 w-5" />}
+                variant="primary"
+                defaultOpen={true}
+              >
+                <NumberRankingAnalysis 
+                  apostas={paidApostas.map(a => ({ dezenas: a.dezenas }))}
+                  maxNumber={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.numberRange || 60}
+                />
+              </CollapsibleSection>
             )}
 
             {/* AI Suggestions */}
@@ -543,42 +631,70 @@ export default function BolaoDetalhes() {
             />
             )}
 
-            {/* Registration Summary - Always Visible */}
-            <RegistrationSummary 
-              bolaoId={bolao.id}
-              lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
-              paidBets={paidApostas.map(a => ({ 
-                id: a.id, 
-                apelido: a.apelido, 
-                dezenas: a.dezenas,
-                registrado: a.registrado,
-                data_registro: a.data_registro
-              }))}
-              onBetRegistrationChange={fetchData}
-            />
+            {/* Registration Summary - Collapsible */}
+            <CollapsibleSection
+              title="Resumo para Registro na Lotérica"
+              description="Todos os jogos que devem ser registrados"
+              icon={<FileText className="h-5 w-5" />}
+              variant="success"
+              defaultOpen={true}
+            >
+              <RegistrationSummary 
+                bolaoId={bolao.id}
+                lotteryName={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.name || "Mega-Sena"}
+                paidBets={paidApostas.map(a => ({ 
+                  id: a.id, 
+                  apelido: a.apelido, 
+                  dezenas: a.dezenas,
+                  registrado: a.registrado,
+                  data_registro: a.data_registro
+                }))}
+                onBetRegistrationChange={fetchData}
+              />
+            </CollapsibleSection>
 
-            {/* Lottery Results Checker */}
-            <LotteryResultsChecker
-              bolaoId={bolao.id}
-              lotteryType={bolao.tipo_loteria}
-              savedNumeroConcurso={bolao.numero_concurso}
-              savedNumerosSorteados={bolao.numeros_sorteados}
-              savedResultadoVerificado={bolao.resultado_verificado || false}
-              paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
-            />
+            {/* Lottery Results Checker - Collapsible */}
+            <CollapsibleSection
+              title="Verificar Resultado do Sorteio"
+              description="Confira se algum jogo foi premiado"
+              icon={<Ticket className="h-5 w-5" />}
+              variant="accent"
+              defaultOpen={false}
+            >
+              <LotteryResultsChecker
+                bolaoId={bolao.id}
+                lotteryType={bolao.tipo_loteria}
+                savedNumeroConcurso={bolao.numero_concurso}
+                savedNumerosSorteados={bolao.numeros_sorteados}
+                savedResultadoVerificado={bolao.resultado_verificado || false}
+                paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
+              />
+            </CollapsibleSection>
 
-            {/* Messages Panel */}
-            <MessagesPanel bolaoId={bolao.id} isGestor={true} />
+            {/* Messages Panel - Collapsible */}
+            <CollapsibleSection
+              title="Mensagens"
+              description="Comunicação com os participantes"
+              icon={<MessageSquare className="h-5 w-5" />}
+              defaultOpen={false}
+            >
+              <MessagesPanel bolaoId={bolao.id} isGestor={true} />
+            </CollapsibleSection>
 
-            {/* Bets Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Apostas Registradas</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BetsTable bets={apostas} onPaymentUpdate={fetchData} />
-              </CardContent>
-            </Card>
+            {/* Bets Table - Collapsible */}
+            <CollapsibleSection
+              title="Apostas Registradas"
+              description={`${apostas.length} apostas no total`}
+              icon={<Table className="h-5 w-5" />}
+              badge={
+                <Badge variant="secondary" className="text-xs">
+                  {paidApostas.length} pagas
+                </Badge>
+              }
+              defaultOpen={true}
+            >
+              <BetsTable bets={apostas} onPaymentUpdate={fetchData} />
+            </CollapsibleSection>
           </div>
         </main>
       </div>
