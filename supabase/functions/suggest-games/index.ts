@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -447,8 +448,39 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Get and validate user authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Não autorizado" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    
+    // Validate user token using anon client
+    const anonSupabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await anonSupabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error("Auth error:", authError?.message);
+      return new Response(
+        JSON.stringify({ error: "Sessão inválida ou expirada" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Authenticated user: ${user.id}`);
+
     const body = await req.json();
     const { 
+      bolaoId,
       totalArrecadado, 
       lotteryConfig, 
       apostas, 
@@ -458,6 +490,7 @@ serve(async (req) => {
       existingGameNumbers = [],
       gameSelections,
     } = body as {
+      bolaoId: string;
       totalArrecadado: number;
       lotteryConfig: LotteryConfig;
       apostas: Aposta[];
@@ -475,7 +508,40 @@ serve(async (req) => {
       }>;
     };
 
-    console.log(`Request received: ${apostas.length} apostas, budget R$ ${totalArrecadado}`);
+    if (!bolaoId) {
+      return new Response(
+        JSON.stringify({ error: "bolaoId é obrigatório" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify user owns this bolao
+    const { data: bolao, error: bolaoError } = await supabase
+      .from("boloes")
+      .select("gestor_id")
+      .eq("id", bolaoId)
+      .single();
+
+    if (bolaoError || !bolao) {
+      console.error("Bolao not found:", bolaoError?.message);
+      return new Response(
+        JSON.stringify({ error: "Bolão não encontrado" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (bolao.gestor_id !== user.id) {
+      console.error(`User ${user.id} is not the owner of bolao ${bolaoId} (owner: ${bolao.gestor_id})`);
+      return new Response(
+        JSON.stringify({ error: "Acesso negado - você não é o gestor deste bolão" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`Request received for bolao ${bolaoId} (gestor: ${user.id}): ${apostas.length} apostas, budget R$ ${totalArrecadado}`);
     
     const analysis = analyzeNumbers(apostas, lotteryConfig.numberRange);
     
