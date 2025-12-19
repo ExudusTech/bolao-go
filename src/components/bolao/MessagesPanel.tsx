@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MessageCircle, Send, Trash2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { MessageCircle, Send, Trash2, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +26,27 @@ interface MessagesPanelProps {
   participanteCelular?: string;
 }
 
+// Audio notification (simple beep)
+const playNotificationSound = () => {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    gainNode.gain.value = 0.1;
+    
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.15);
+  } catch (e) {
+    // Audio not supported or blocked
+  }
+};
+
 export function MessagesPanel({ 
   bolaoId, 
   isGestor = false, 
@@ -34,7 +56,26 @@ export function MessagesPanel({
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastMessageCountRef = useRef(0);
+  const isFirstLoadRef = useRef(true);
+
+  const handleNewMessages = useCallback((newMessages: Message[]) => {
+    if (isFirstLoadRef.current) {
+      isFirstLoadRef.current = false;
+      lastMessageCountRef.current = newMessages.length;
+      return;
+    }
+
+    const newCount = newMessages.length - lastMessageCountRef.current;
+    if (newCount > 0 && !isExpanded) {
+      setUnreadCount(prev => prev + newCount);
+      playNotificationSound();
+    }
+    lastMessageCountRef.current = newMessages.length;
+  }, [isExpanded]);
 
   useEffect(() => {
     fetchMessages();
@@ -80,7 +121,9 @@ export function MessagesPanel({
       return;
     }
 
-    setMessages(data || []);
+    const newMessages = data || [];
+    handleNewMessages(newMessages);
+    setMessages(newMessages);
   }
 
   async function handleSendMessage(e: React.FormEvent) {
@@ -152,14 +195,38 @@ export function MessagesPanel({
     }
   }
 
+  const handleExpand = () => {
+    setIsExpanded(true);
+    setUnreadCount(0);
+  };
+
+  const handleCollapse = () => {
+    setIsExpanded(false);
+  };
+
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <MessageCircle className="h-5 w-5" />
-          Mensagens do Bolão
+      <CardHeader 
+        className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+        onClick={isExpanded ? handleCollapse : handleExpand}
+      >
+        <CardTitle className="flex items-center justify-between text-lg">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            Mensagens do Bolão
+            {unreadCount > 0 && (
+              <Badge variant="destructive" className="animate-pulse flex items-center gap-1">
+                <Bell className="h-3 w-3" />
+                {unreadCount} {unreadCount === 1 ? 'nova' : 'novas'}
+              </Badge>
+            )}
+          </div>
+          <span className="text-sm font-normal text-muted-foreground">
+            {isExpanded ? 'Clique para minimizar' : 'Clique para expandir'}
+          </span>
         </CardTitle>
       </CardHeader>
+      {isExpanded && (
       <CardContent className="space-y-4">
         <ScrollArea className="h-[300px] pr-4" ref={scrollRef}>
           {messages.length === 0 ? (
@@ -235,6 +302,7 @@ export function MessagesPanel({
           </p>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }
