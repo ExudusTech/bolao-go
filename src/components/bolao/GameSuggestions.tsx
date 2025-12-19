@@ -61,6 +61,32 @@ export function GameSuggestions({
   const [customSize, setCustomSize] = useState<string>("");
   const [customCriteria, setCustomCriteria] = useState<GameCriteria | "">("");
   const [isLoadingCustom, setIsLoadingCustom] = useState(false);
+  const [showFullRanking, setShowFullRanking] = useState(false);
+
+  // Build complete ranking of all 60 numbers
+  const fullRanking = useMemo(() => {
+    const allNumbers: Map<number, number> = new Map();
+    
+    // Initialize all 60 numbers with 0 votes
+    for (let i = 1; i <= 60; i++) {
+      allNumbers.set(i, 0);
+    }
+    
+    // Add votes from mostVoted
+    analysis.mostVoted.forEach(({ number, count }) => {
+      allNumbers.set(number, count);
+    });
+    
+    // Add votes from leastVoted (if they have counts)
+    analysis.leastVoted.forEach(({ number, count }) => {
+      allNumbers.set(number, count);
+    });
+    
+    // Sort by vote count (descending), then by number (ascending)
+    return Array.from(allNumbers.entries())
+      .map(([number, count]) => ({ number, count }))
+      .sort((a, b) => b.count - a.count || a.number - b.number);
+  }, [analysis]);
 
   // Sync new suggestions from props (for "more suggestions" feature)
   useEffect(() => {
@@ -290,48 +316,133 @@ export function GameSuggestions({
 
         {/* Number Analysis */}
         <div className="space-y-3">
-          <h4 className="text-sm font-medium">Análise dos Números</h4>
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-              <p className="text-xs text-muted-foreground mb-2">🔥 Mais Votados</p>
-              <div className="flex flex-wrap gap-1">
-                {analysis.mostVoted.slice(0, 6).map(({ number, count }) => (
-                  <Badge key={number} variant="secondary" className="bg-primary/20 text-primary">
-                    {number.toString().padStart(2, "0")} ({count}x)
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="p-3 rounded-lg bg-muted/50 border">
-              <p className="text-xs text-muted-foreground mb-2">❄️ Menos Votados</p>
-              <div className="flex flex-wrap gap-1">
-                {analysis.leastVoted.slice(0, 6).map(({ number, count }) => (
-                  <Badge key={number} variant="outline">
-                    {number.toString().padStart(2, "0")} ({count}x)
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
-              <p className="text-xs text-muted-foreground mb-2">✨ Não Votados</p>
-              <div className="flex flex-wrap gap-1">
-                {analysis.notVoted.length > 0 ? (
-                  analysis.notVoted.slice(0, 8).map((number) => (
-                    <Badge key={number} variant="outline" className="border-accent/50 text-accent">
-                      {number.toString().padStart(2, "0")}
-                    </Badge>
-                  ))
-                ) : (
-                  <span className="text-xs text-muted-foreground">Todos votados</span>
-                )}
-                {analysis.notVoted.length > 8 && (
-                  <Badge variant="outline" className="border-accent/50 text-accent">
-                    +{analysis.notVoted.length - 8}
-                  </Badge>
-                )}
-              </div>
-            </div>
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium">Análise dos Números</h4>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowFullRanking(!showFullRanking)}
+            >
+              {showFullRanking ? "Ver Resumo" : "Ver Ranking Completo"}
+            </Button>
           </div>
+          
+          {showFullRanking ? (
+            /* Full Ranking of all 60 numbers */
+            <div className="p-4 rounded-lg bg-muted/30 border">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium">Ranking Completo - 60 Números</p>
+                <div className="flex gap-2 text-xs">
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full bg-primary"></span> Top 10
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full bg-accent"></span> 11-30
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full bg-muted-foreground"></span> 31-50
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-3 h-3 rounded-full bg-destructive/50"></span> Últimos 10
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-12 gap-2">
+                {fullRanking.map(({ number, count }, index) => {
+                  const position = index + 1;
+                  let bgClass = "bg-muted text-muted-foreground";
+                  if (position <= 10) bgClass = "bg-primary text-primary-foreground";
+                  else if (position <= 30) bgClass = "bg-accent text-accent-foreground";
+                  else if (position > 50) bgClass = "bg-destructive/50 text-destructive-foreground";
+                  
+                  return (
+                    <div 
+                      key={number} 
+                      className={`flex flex-col items-center justify-center p-2 rounded-lg ${bgClass} transition-transform hover:scale-105`}
+                    >
+                      <span className="text-lg font-bold">{number.toString().padStart(2, "0")}</span>
+                      <span className="text-xs opacity-80">{count}x</span>
+                      <span className="text-[10px] opacity-60">#{position}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Summary table */}
+              <div className="mt-4 pt-4 border-t space-y-2">
+                <p className="text-sm font-medium">Resumo do Ranking</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div className="p-2 rounded bg-primary/10 border border-primary/20">
+                    <p className="text-muted-foreground">Top 10 (mais votados)</p>
+                    <p className="font-mono">{fullRanking.slice(0, 10).map(n => n.number.toString().padStart(2, "0")).join(", ")}</p>
+                  </div>
+                  <div className="p-2 rounded bg-accent/10 border border-accent/20">
+                    <p className="text-muted-foreground">11º ao 20º</p>
+                    <p className="font-mono">{fullRanking.slice(10, 20).map(n => n.number.toString().padStart(2, "0")).join(", ")}</p>
+                  </div>
+                  <div className="p-2 rounded bg-muted/50 border">
+                    <p className="text-muted-foreground">21º ao 30º</p>
+                    <p className="font-mono">{fullRanking.slice(20, 30).map(n => n.number.toString().padStart(2, "0")).join(", ")}</p>
+                  </div>
+                  <div className="p-2 rounded bg-destructive/10 border border-destructive/20">
+                    <p className="text-muted-foreground">Últimos 10 (menos votados)</p>
+                    <p className="font-mono">{fullRanking.slice(-10).map(n => n.number.toString().padStart(2, "0")).join(", ")}</p>
+                  </div>
+                </div>
+                <div className="p-2 rounded bg-accent/5 border border-accent/20">
+                  <p className="text-muted-foreground text-xs">Não Votados ({analysis.notVoted.length})</p>
+                  <p className="font-mono text-xs">
+                    {analysis.notVoted.length > 0 
+                      ? analysis.notVoted.map(n => n.toString().padStart(2, "0")).join(", ")
+                      : "Todos os números foram votados"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Summary view */
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <p className="text-xs text-muted-foreground mb-2">🔥 Mais Votados</p>
+                <div className="flex flex-wrap gap-1">
+                  {analysis.mostVoted.slice(0, 6).map(({ number, count }) => (
+                    <Badge key={number} variant="secondary" className="bg-primary/20 text-primary">
+                      {number.toString().padStart(2, "0")} ({count}x)
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <p className="text-xs text-muted-foreground mb-2">❄️ Menos Votados</p>
+                <div className="flex flex-wrap gap-1">
+                  {analysis.leastVoted.slice(0, 6).map(({ number, count }) => (
+                    <Badge key={number} variant="outline">
+                      {number.toString().padStart(2, "0")} ({count}x)
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="p-3 rounded-lg bg-accent/5 border border-accent/20">
+                <p className="text-xs text-muted-foreground mb-2">✨ Não Votados</p>
+                <div className="flex flex-wrap gap-1">
+                  {analysis.notVoted.length > 0 ? (
+                    analysis.notVoted.slice(0, 8).map((number) => (
+                      <Badge key={number} variant="outline" className="border-accent/50 text-accent">
+                        {number.toString().padStart(2, "0")}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Todos votados</span>
+                  )}
+                  {analysis.notVoted.length > 8 && (
+                    <Badge variant="outline" className="border-accent/50 text-accent">
+                      +{analysis.notVoted.length - 8}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Game Suggestions */}
