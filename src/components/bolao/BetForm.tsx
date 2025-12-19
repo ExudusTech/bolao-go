@@ -153,12 +153,15 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
       .from('receipts')
       .getPublicUrl(fileName);
 
-    const { error: updateError } = await supabase
-      .from('apostas')
-      .update({ receipt_url: publicUrl })
-      .eq('id', uploadingBetId);
+    // Use secure RPC function with ownership validation
+    const celular = participantInfo?.celular || '';
+    const { data: success, error: updateError } = await supabase.rpc('upload_receipt', {
+      p_aposta_id: uploadingBetId,
+      p_receipt_url: publicUrl,
+      p_celular: celular
+    });
 
-    if (updateError) {
+    if (updateError || !success) {
       toast.error("Erro ao vincular comprovante");
     } else {
       toast.success("Comprovante enviado com sucesso!");
