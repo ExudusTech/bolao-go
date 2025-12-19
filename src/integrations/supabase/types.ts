@@ -161,6 +161,44 @@ export type Database = {
           },
         ]
       }
+      mensagens: {
+        Row: {
+          autor_celular: string | null
+          autor_gestor_id: string | null
+          autor_nome: string
+          bolao_id: string
+          conteudo: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          autor_celular?: string | null
+          autor_gestor_id?: string | null
+          autor_nome: string
+          bolao_id: string
+          conteudo: string
+          created_at?: string
+          id?: string
+        }
+        Update: {
+          autor_celular?: string | null
+          autor_gestor_id?: string | null
+          autor_nome?: string
+          bolao_id?: string
+          conteudo?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mensagens_bolao_id_fkey"
+            columns: ["bolao_id"]
+            isOneToOne: false
+            referencedRelation: "boloes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

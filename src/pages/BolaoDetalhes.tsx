@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria } from "@/components/bolao/GameSuggestions";
+import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -510,6 +511,9 @@ export default function BolaoDetalhes() {
                 availableSizes={Object.keys(LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices || {}).map(Number).filter(n => n >= 7)}
               />
             )}
+
+            {/* Messages Panel */}
+            <MessagesPanel bolaoId={bolao.id} isGestor={true} />
 
             {/* Bets Table */}
             <Card>
