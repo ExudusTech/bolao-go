@@ -562,14 +562,6 @@ serve(async (req) => {
       const skippedGames: SkippedGame[] = [];
       let gameIndex = 1;
       
-      // Track used numbers by category
-      const usedNumbersByCategory: Record<string, Set<number>> = {
-        mais_votados: new Set(),
-        menos_votados: new Set(),
-        nao_votados: new Set(),
-        misto: new Set(),
-      };
-      
       // Get ranked numbers
       const rankedMostVoted = analysis.fullRanking.filter(e => e.count > 0);
       const rankedLeastVoted = [...rankedMostVoted].sort((a, b) => {
@@ -577,7 +569,21 @@ serve(async (req) => {
         return a.number - b.number;
       });
       
-      for (const selection of gameSelections) {
+      console.log(`Full ranking (most voted first): ${rankedMostVoted.slice(0, 15).map(e => `${e.number}(${e.count})`).join(', ')}`);
+      console.log(`Least voted ranking: ${rankedLeastVoted.slice(0, 15).map(e => `${e.number}(${e.count})`).join(', ')}`);
+      
+      // Track how many games we've generated per criteria (for sequential games)
+      const gamesPerCriteria: Record<string, number> = {
+        mais_votados: 0,
+        menos_votados: 0,
+        nao_votados: 0,
+        misto: 0,
+      };
+      
+      // Sort selections by size descending to generate larger games first
+      const sortedSelections = [...gameSelections].sort((a, b) => b.size - a.size);
+      
+      for (const selection of sortedSelections) {
         const { size, criteria, quantity } = selection;
         const price = lotteryConfig.prices[size];
         
@@ -588,55 +594,53 @@ serve(async (req) => {
           let reason = '';
           
           if (criteria === 'mais_votados') {
-            const startIdx = usedNumbersByCategory.mais_votados.size;
-            const available = rankedMostVoted
-              .slice(startIdx, startIdx + size)
+            // For "mais_votados", ALWAYS use the TOP N numbers from the ranking
+            // This means a 10-number game uses positions 1-10, a 9-number game uses positions 1-9, etc.
+            const topNumbers = rankedMostVoted
+              .slice(0, size)
               .map(e => e.number);
             
-            if (available.length >= size) {
-              numbers = available.slice(0, size);
-              const start = startIdx + 1;
-              const end = start + size - 1;
-              reason = `Jogo com ${size} números MAIS VOTADOS (ranking ${start}º ao ${end}º)`;
+            if (topNumbers.length >= size) {
+              numbers = topNumbers;
+              reason = `Jogo com ${size} números MAIS VOTADOS (TOP ${size} do ranking: posições 1º ao ${size}º)`;
+              console.log(`mais_votados game ${size} dezenas: using TOP ${size} numbers: ${numbers.join(', ')}`);
             }
           } else if (criteria === 'menos_votados') {
-            const startIdx = usedNumbersByCategory.menos_votados.size;
-            const available = rankedLeastVoted
-              .slice(startIdx, startIdx + size)
+            // For "menos_votados", use the TOP N from the least voted ranking
+            const leastNumbers = rankedLeastVoted
+              .slice(0, size)
               .map(e => e.number);
             
-            if (available.length >= size) {
-              numbers = available.slice(0, size);
-              const start = startIdx + 1;
-              const end = start + size - 1;
-              reason = `Jogo com ${size} números MENOS VOTADOS (ranking ${start}º ao ${end}º)`;
+            if (leastNumbers.length >= size) {
+              numbers = leastNumbers;
+              reason = `Jogo com ${size} números MENOS VOTADOS (TOP ${size} menos votados: posições 1º ao ${size}º)`;
+              console.log(`menos_votados game ${size} dezenas: using TOP ${size} least voted: ${numbers.join(', ')}`);
             }
           } else if (criteria === 'nao_votados') {
-            const available = analysis.notVoted
-              .filter(n => !usedNumbersByCategory.nao_votados.has(n));
+            // For "nao_votados", use the first N numbers that weren't voted
+            const notVotedNumbers = analysis.notVoted.slice(0, size);
             
-            if (available.length >= size) {
-              numbers = available.slice(0, size);
+            if (notVotedNumbers.length >= size) {
+              numbers = notVotedNumbers;
               reason = `Jogo com ${size} números NÃO VOTADOS`;
+              console.log(`nao_votados game ${size} dezenas: ${numbers.join(', ')}`);
             }
           } else if (criteria === 'misto') {
+            // Mixed: half from most voted, half from least voted
             const halfSize = Math.ceil(size / 2);
-            const usedInMisto = usedNumbersByCategory.misto;
+            const otherHalf = size - halfSize;
             
-            const fromMost = rankedMostVoted
-              .filter(e => !usedInMisto.has(e.number))
-              .slice(0, halfSize)
-              .map(e => e.number);
-            
+            const fromMost = rankedMostVoted.slice(0, halfSize).map(e => e.number);
             const fromLeast = rankedLeastVoted
-              .filter(e => !usedInMisto.has(e.number) && !fromMost.includes(e.number))
-              .slice(0, size - fromMost.length)
+              .filter(e => !fromMost.includes(e.number))
+              .slice(0, otherHalf)
               .map(e => e.number);
             
             const combined = [...fromMost, ...fromLeast];
             if (combined.length >= size) {
               numbers = combined.slice(0, size);
-              reason = `Jogo MISTO com ${size} números (mais e menos votados)`;
+              reason = `Jogo MISTO com ${size} números (${halfSize} mais votados + ${otherHalf} menos votados)`;
+              console.log(`misto game ${size} dezenas: ${numbers.join(', ')}`);
             }
           }
           
@@ -644,9 +648,10 @@ serve(async (req) => {
             const sortedNumbers = [...numbers].sort((a, b) => a - b);
             const gameKey = sortedNumbers.join(',');
             
+            // Check if this exact game already exists
             if (!existingGames.has(gameKey)) {
-              numbers.forEach(n => usedNumbersByCategory[criteria].add(n));
               existingGames.add(gameKey);
+              gamesPerCriteria[criteria]++;
               
               suggestions.push({
                 id: `suggestion-${gameIndex}`,
@@ -658,13 +663,18 @@ serve(async (req) => {
               });
               
               gameIndex++;
-              console.log(`Generated ${criteria} game: ${size} numbers, R$ ${price.toFixed(2)}`);
+              console.log(`Added ${criteria} game: ${size} numbers = [${sortedNumbers.join(', ')}], R$ ${price.toFixed(2)}`);
+            } else {
+              console.log(`Skipped duplicate game: ${sortedNumbers.join(', ')}`);
             }
           } else {
-            console.log(`Could not generate ${criteria} game: ${size} numbers - not enough available numbers`);
+            console.log(`Could not generate ${criteria} game: ${size} numbers - not enough available numbers (got ${numbers?.length || 0})`);
           }
         }
       }
+      
+      // Sort suggestions by size descending for better presentation
+      suggestions.sort((a, b) => b.numbers.length - a.numbers.length);
       
       console.log(`Generated ${suggestions.length} games from user selections`);
       
