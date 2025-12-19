@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { BetForm } from "@/components/bolao/BetForm";
+import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +21,8 @@ export default function Participar() {
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [loading, setLoading] = useState(true);
   const [counter, setCounter] = useState(0);
+  const [participanteName, setParticipanteName] = useState<string>();
+  const [participanteCelular, setParticipanteCelular] = useState<string>();
 
   const fetchBolao = useCallback(async () => {
     if (!id) return;
@@ -40,8 +43,12 @@ export default function Participar() {
     fetchBolao();
   }, [fetchBolao]);
 
-  const handleSuccess = () => {
+  const handleSuccess = (apelido?: string, celular?: string) => {
     setCounter((prev) => prev + 1);
+    if (apelido && celular) {
+      setParticipanteName(apelido);
+      setParticipanteCelular(celular);
+    }
   };
 
   if (loading) {
@@ -116,6 +123,16 @@ export default function Participar() {
             observacoes={bolao.observacoes || undefined}
             onSuccess={handleSuccess}
           />
+
+          {/* Messages Panel */}
+          <div className="w-full max-w-md mt-6">
+            <MessagesPanel 
+              bolaoId={bolao.id} 
+              isGestor={false}
+              participanteName={participanteName}
+              participanteCelular={participanteCelular}
+            />
+          </div>
         </div>
       </main>
 

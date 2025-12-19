@@ -16,7 +16,7 @@ interface BetFormProps {
   bolaoNome: string;
   chavePix: string;
   observacoes?: string;
-  onSuccess: () => void;
+  onSuccess: (apelido?: string, celular?: string) => void;
 }
 
 interface SessionBet {
@@ -112,7 +112,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     
     setHasSubmittedBet(true);
     setSelectedNumbers([]);
-    onSuccess();
+    onSuccess(apelido, celular);
   };
 
   const handleNewBet = () => {
