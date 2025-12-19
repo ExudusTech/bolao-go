@@ -1,12 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { ClosedBolaoMessage } from "@/components/bolao/ClosedBolaoMessage";
 import { BetForm } from "@/components/bolao/BetForm";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Users, ArrowLeft } from "lucide-react";
+import { useParticipantAuth } from "@/hooks/useParticipantAuth";
+import { Loader2, Users, ArrowLeft, LogIn, LogOut } from "lucide-react";
+import { toast } from "sonner";
 
 interface Bolao {
   id: string;
@@ -22,11 +24,11 @@ interface Bolao {
 
 export default function Participar() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { session, isLoading: authLoading, logout } = useParticipantAuth(id);
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [loading, setLoading] = useState(true);
   const [counter, setCounter] = useState(0);
-  const [participanteName, setParticipanteName] = useState<string>();
-  const [participanteCelular, setParticipanteCelular] = useState<string>();
 
   const fetchBolao = useCallback(async () => {
     if (!id) return;
@@ -52,15 +54,18 @@ export default function Participar() {
     fetchBolao();
   }, [fetchBolao]);
 
-  const handleSuccess = (apelido?: string, celular?: string) => {
+  const handleSuccess = () => {
     setCounter((prev) => prev + 1);
-    if (apelido && celular) {
-      setParticipanteName(apelido);
-      setParticipanteCelular(celular);
-    }
+    // Redirect to login after successful bet
+    toast.success("Aposta registrada! Faça login para acessar todas as funcionalidades.");
   };
 
-  if (loading) {
+  const handleLogout = async () => {
+    await logout();
+    toast.success("Logout realizado com sucesso!");
+  };
+
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -103,6 +108,17 @@ export default function Participar() {
               </div>
               <span className="font-bold text-foreground">Robolão</span>
             </Link>
+            {session && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Olá, <span className="font-medium text-foreground">{session.apelido}</span>
+                </span>
+                <Button variant="ghost" size="sm" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-1" />
+                  Sair
+                </Button>
+              </div>
+            )}
           </div>
         </header>
 
@@ -112,18 +128,29 @@ export default function Participar() {
             bolaoNome={bolao.nome_do_bolao}
             resultadoVerificado={bolao.resultado_verificado}
             numerosSorteados={bolao.numeros_sorteados}
-            isPrized={false} // TODO: Calculate if prized based on bets
+            isPrized={false}
           />
 
-          {/* Messages Panel - still visible */}
+          {/* Messages Panel */}
           <div className="w-full max-w-md mt-8">
             <MessagesPanel 
               bolaoId={bolao.id} 
               isGestor={false}
-              participanteName={participanteName}
-              participanteCelular={participanteCelular}
+              participantToken={session?.token}
+              participantApelido={session?.apelido}
             />
           </div>
+
+          {!session && (
+            <div className="mt-4">
+              <Button asChild>
+                <Link to={`/participar/${id}/login`}>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Fazer login para interagir
+                </Link>
+              </Button>
+            </div>
+          )}
         </main>
 
         {/* Footer */}
@@ -150,6 +177,24 @@ export default function Participar() {
             </div>
             <span className="font-bold text-foreground">Robolão</span>
           </Link>
+          {session ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Olá, <span className="font-medium text-foreground">{session.apelido}</span>
+              </span>
+              <Button variant="ghost" size="sm" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-1" />
+                Sair
+              </Button>
+            </div>
+          ) : (
+            <Button asChild variant="outline" size="sm">
+              <Link to={`/participar/${id}/login`}>
+                <LogIn className="h-4 w-4 mr-2" />
+                Entrar
+              </Link>
+            </Button>
+          )}
         </div>
       </header>
 
@@ -187,8 +232,8 @@ export default function Participar() {
             <MessagesPanel 
               bolaoId={bolao.id} 
               isGestor={false}
-              participanteName={participanteName}
-              participanteCelular={participanteCelular}
+              participantToken={session?.token}
+              participantApelido={session?.apelido}
             />
           </div>
         </div>

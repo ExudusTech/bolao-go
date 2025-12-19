@@ -13,7 +13,6 @@ import { ptBR } from "date-fns/locale";
 interface Message {
   id: string;
   autor_nome: string;
-  autor_celular: string | null;
   autor_gestor_id: string | null;
   conteudo: string;
   created_at: string;
@@ -22,8 +21,8 @@ interface Message {
 interface MessagesPanelProps {
   bolaoId: string;
   isGestor?: boolean;
-  participanteName?: string;
-  participanteCelular?: string;
+  participantToken?: string;
+  participantApelido?: string;
 }
 
 // Audio notification (simple beep)
@@ -50,8 +49,8 @@ const playNotificationSound = () => {
 export function MessagesPanel({ 
   bolaoId, 
   isGestor = false, 
-  participanteName,
-  participanteCelular 
+  participantToken,
+  participantApelido 
 }: MessagesPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -157,21 +156,25 @@ export function MessagesPanel({
 
         if (error) throw error;
       } else {
-        if (!participanteName || !participanteCelular) {
-          toast.error("Identifique-se antes de enviar mensagens");
+        if (!participantToken) {
+          toast.error("Faça login para enviar mensagens");
           return;
         }
 
-        const { error } = await supabase
-          .from('mensagens')
-          .insert({
-            bolao_id: bolaoId,
-            autor_nome: participanteName,
-            autor_celular: participanteCelular,
-            conteudo: newMessage.trim()
-          });
+        // Use RPC function for authenticated participant message
+        const { data, error } = await supabase.rpc("send_participant_message", {
+          p_bolao_id: bolaoId,
+          p_token: participantToken,
+          p_content: newMessage.trim()
+        });
 
         if (error) throw error;
+        
+        const result = data as { success: boolean; error?: string };
+        if (!result.success) {
+          toast.error(result.error || "Erro ao enviar mensagem");
+          return;
+        }
       }
 
       setNewMessage("");
@@ -244,7 +247,7 @@ export function MessagesPanel({
                 const isFromGestor = !!msg.autor_gestor_id;
                 const isOwnMessage = isGestor 
                   ? isFromGestor 
-                  : msg.autor_celular === participanteCelular;
+                  : msg.autor_nome === participantApelido;
 
                 return (
                   <div
@@ -290,7 +293,7 @@ export function MessagesPanel({
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Digite sua mensagem..."
-            disabled={sending || (!isGestor && (!participanteName || !participanteCelular))}
+            disabled={sending || (!isGestor && !participantToken)}
           />
           <Button 
             type="submit" 
@@ -301,9 +304,9 @@ export function MessagesPanel({
           </Button>
         </form>
 
-        {!isGestor && (!participanteName || !participanteCelular) && (
+        {!isGestor && !participantToken && (
           <p className="text-xs text-muted-foreground text-center">
-            Faça uma aposta para poder enviar mensagens
+            Faça login para enviar mensagens
           </p>
         )}
       </CardContent>
