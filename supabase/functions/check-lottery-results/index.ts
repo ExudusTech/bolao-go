@@ -50,36 +50,72 @@ serve(async (req) => {
 
     console.log(`Buscando resultado do concurso ${numeroConcurso} para bolão ${bolaoId}`);
 
-    // Fetch lottery result from Caixa API
-    const caixaUrl = `https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena/${numeroConcurso}`;
+    // Fetch lottery result - try multiple APIs
+    let lotteryResult: CaixaLotteryResult | null = null;
     
-    let lotteryResult: CaixaLotteryResult;
+    // Try the loteriascaixa-api first (more reliable)
     try {
-      const caixaResponse = await fetch(caixaUrl, {
+      const alternativeUrl = `https://loteriascaixa-api.herokuapp.com/api/mega-sena/${numeroConcurso}`;
+      console.log(`Tentando API alternativa: ${alternativeUrl}`);
+      
+      const altResponse = await fetch(alternativeUrl, {
         headers: {
           "Accept": "application/json",
-          "User-Agent": "Mozilla/5.0",
         },
       });
 
-      if (!caixaResponse.ok) {
-        console.error(`Caixa API error: ${caixaResponse.status}`);
-        return new Response(
-          JSON.stringify({ 
-            error: "Não foi possível buscar o resultado. O concurso pode não ter sido sorteado ainda.",
-            status: caixaResponse.status 
-          }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      if (altResponse.ok) {
+        const altData = await altResponse.json();
+        console.log("API alternativa respondeu:", JSON.stringify(altData));
+        
+        if (altData && altData.dezenas) {
+          lotteryResult = {
+            numero: altData.concurso || numeroConcurso,
+            dataApuracao: altData.data || new Date().toISOString(),
+            listaDezenas: altData.dezenas,
+            acumulado: altData.acumulou || false,
+            valorAcumuladoProximoConcurso: altData.acumuladaProxConcurso || 0,
+          };
+        }
       }
+    } catch (altError) {
+      console.log("API alternativa falhou, tentando API da Caixa...", altError);
+    }
 
-      lotteryResult = await caixaResponse.json();
-      console.log(`Resultado encontrado: ${JSON.stringify(lotteryResult.listaDezenas)}`);
-    } catch (fetchError) {
-      console.error("Erro ao buscar resultado da Caixa:", fetchError);
+    // If alternative API failed, try Caixa API
+    if (!lotteryResult) {
+      const caixaUrl = `https://servicebus2.caixa.gov.br/portaldeloterias/api/megasena/${numeroConcurso}`;
+      console.log(`Tentando API Caixa: ${caixaUrl}`);
+      
+      try {
+        const caixaResponse = await fetch(caixaUrl, {
+          headers: {
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Referer": "https://loterias.caixa.gov.br/",
+            "Origin": "https://loterias.caixa.gov.br",
+          },
+        });
+
+        if (caixaResponse.ok) {
+          const caixaData = await caixaResponse.json();
+          lotteryResult = caixaData;
+          console.log(`Caixa API respondeu: ${JSON.stringify(caixaData.listaDezenas)}`);
+        } else {
+          console.error(`Caixa API error: ${caixaResponse.status}`);
+        }
+      } catch (caixaError) {
+        console.error("Erro na API da Caixa:", caixaError);
+      }
+    }
+
+    if (!lotteryResult) {
       return new Response(
-        JSON.stringify({ error: "Erro ao conectar com a API da Caixa" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ 
+          error: "Não foi possível buscar o resultado. Tente novamente em alguns minutos.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
