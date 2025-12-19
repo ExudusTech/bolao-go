@@ -129,8 +129,10 @@ export type Database = {
           categoria: string
           created_at: string
           custo: number
+          data_registro: string | null
           dezenas: number[]
           id: string
+          registrado: boolean
           tipo: string
         }
         Insert: {
@@ -138,8 +140,10 @@ export type Database = {
           categoria: string
           created_at?: string
           custo: number
+          data_registro?: string | null
           dezenas: number[]
           id?: string
+          registrado?: boolean
           tipo: string
         }
         Update: {
@@ -147,8 +151,10 @@ export type Database = {
           categoria?: string
           created_at?: string
           custo?: number
+          data_registro?: string | null
           dezenas?: number[]
           id?: string
+          registrado?: boolean
           tipo?: string
         }
         Relationships: [

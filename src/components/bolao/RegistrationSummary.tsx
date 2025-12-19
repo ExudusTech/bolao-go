@@ -3,9 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { FileText, Copy, Loader2, Ticket } from "lucide-react";
+import { FileText, Copy, Loader2, Ticket, Check } from "lucide-react";
 import { toast } from "sonner";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface SavedGame {
   id: string;
@@ -13,6 +16,8 @@ interface SavedGame {
   tipo: string;
   custo: number;
   categoria: string;
+  registrado: boolean;
+  data_registro: string | null;
 }
 
 interface IndividualBet {
@@ -30,6 +35,7 @@ interface RegistrationSummaryProps {
 export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: RegistrationSummaryProps) {
   const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSavedGames();
@@ -49,9 +55,37 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
     setLoading(false);
   };
 
+  const toggleRegistrado = async (gameId: string, currentStatus: boolean) => {
+    setUpdatingId(gameId);
+    const newStatus = !currentStatus;
+    const dataRegistro = newStatus ? new Date().toISOString() : null;
+
+    const { error } = await supabase
+      .from("jogos_selecionados")
+      .update({ 
+        registrado: newStatus, 
+        data_registro: dataRegistro 
+      })
+      .eq("id", gameId);
+
+    if (error) {
+      toast.error("Erro ao atualizar status do jogo");
+    } else {
+      setSavedGames(prev => 
+        prev.map(game => 
+          game.id === gameId 
+            ? { ...game, registrado: newStatus, data_registro: dataRegistro }
+            : game
+        )
+      );
+      toast.success(newStatus ? "Jogo marcado como registrado!" : "Registro removido");
+    }
+    setUpdatingId(null);
+  };
+
+  const registeredCount = savedGames.filter(g => g.registrado).length;
   const totalGamesCount = savedGames.length + paidBets.length;
   const totalGamesCost = savedGames.reduce((sum, g) => sum + g.custo, 0);
-  // Apostas individuais usam o custo mínimo (6 dezenas = R$ 5.00 para Mega-Sena)
   const individualCost = paidBets.length * 5.00;
   const totalCost = totalGamesCost + individualCost;
 
@@ -70,8 +104,9 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
       lines.push(``);
       savedGames.forEach((game, index) => {
         const nums = game.dezenas.map(n => n.toString().padStart(2, "0")).join(" - ");
+        const status = game.registrado ? "✅ Registrado" : "⏳ Pendente";
         lines.push(`Jogo ${index + 1} (${game.tipo}): ${nums}`);
-        lines.push(`   Valor: R$ ${game.custo.toFixed(2)} | Categoria: ${game.categoria}`);
+        lines.push(`   Valor: R$ ${game.custo.toFixed(2)} | ${status}`);
         lines.push(``);
       });
     }
@@ -79,7 +114,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
     if (paidBets.length > 0) {
       lines.push(`👤 APOSTAS INDIVIDUAIS (${paidBets.length}):`);
       lines.push(``);
-      paidBets.forEach((bet, index) => {
+      paidBets.forEach((bet) => {
         const nums = bet.dezenas.sort((a, b) => a - b).map(n => n.toString().padStart(2, "0")).join(" - ");
         lines.push(`${bet.apelido}: ${nums}`);
       });
@@ -125,7 +160,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Summary Header */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="p-3 rounded-lg bg-muted/50 border text-center">
             <p className="text-xs text-muted-foreground">Loteria</p>
             <p className="text-lg font-bold">{lotteryName}</p>
@@ -138,6 +173,10 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
             <p className="text-xs text-muted-foreground">Valor Total</p>
             <p className="text-lg font-bold text-success">R$ {totalCost.toFixed(2)}</p>
           </div>
+          <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-center">
+            <p className="text-xs text-muted-foreground">Registrados</p>
+            <p className="text-lg font-bold text-primary">{registeredCount}/{savedGames.length}</p>
+          </div>
         </div>
 
         {/* Saved Games Section */}
@@ -149,19 +188,49 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
             </h4>
             <div className="space-y-2">
               {savedGames.map((game, index) => (
-                <div key={game.id} className="p-4 rounded-lg bg-primary/5 border border-primary/20">
+                <div 
+                  key={game.id} 
+                  className={`p-4 rounded-lg border transition-colors ${
+                    game.registrado 
+                      ? "bg-success/10 border-success/30" 
+                      : "bg-primary/5 border-primary/20"
+                  }`}
+                >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="default">Jogo {index + 1} - {game.tipo}</Badge>
-                      <Badge variant="outline" className="text-xs">{game.categoria}</Badge>
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id={`game-${game.id}`}
+                        checked={game.registrado}
+                        disabled={updatingId === game.id}
+                        onCheckedChange={() => toggleRegistrado(game.id, game.registrado)}
+                        className="h-5 w-5"
+                      />
+                      <div className="flex items-center gap-2">
+                        <Badge variant={game.registrado ? "default" : "secondary"}>
+                          {game.registrado && <Check className="h-3 w-3 mr-1" />}
+                          Jogo {index + 1} - {game.tipo}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">{game.categoria}</Badge>
+                      </div>
                     </div>
-                    <span className="text-sm font-medium">R$ {game.custo.toFixed(2)}</span>
+                    <div className="text-right">
+                      <span className="text-sm font-medium">R$ {game.custo.toFixed(2)}</span>
+                      {game.registrado && game.data_registro && (
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(game.data_registro), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {game.dezenas.map((num) => (
                       <span
                         key={num}
-                        className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-primary text-primary-foreground text-sm font-bold"
+                        className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold ${
+                          game.registrado 
+                            ? "bg-success text-success-foreground" 
+                            : "bg-primary text-primary-foreground"
+                        }`}
                       >
                         {num.toString().padStart(2, "0")}
                       </span>
@@ -183,7 +252,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets }: Registra
               Apostas Individuais ({paidBets.length})
             </h4>
             <div className="space-y-2">
-              {paidBets.map((bet, index) => (
+              {paidBets.map((bet) => (
                 <div key={bet.id} className="p-4 rounded-lg bg-accent/5 border border-accent/20">
                   <div className="flex items-center justify-between mb-2">
                     <Badge variant="secondary">{bet.apelido}</Badge>
