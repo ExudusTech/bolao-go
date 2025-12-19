@@ -258,6 +258,10 @@ export type Database = {
           total_apostas: number
         }[]
       }
+      upload_receipt: {
+        Args: { p_aposta_id: string; p_celular: string; p_receipt_url: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
