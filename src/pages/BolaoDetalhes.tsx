@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria } from "@/components/bolao/GameSuggestions";
+import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
 import { LotteryResultsChecker } from "@/components/bolao/LotteryResultsChecker";
@@ -497,6 +498,14 @@ export default function BolaoDetalhes() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Number Ranking Analysis - Always Visible when there are paid bets */}
+            {paidApostas.length > 0 && (
+              <NumberRankingAnalysis 
+                apostas={paidApostas.map(a => ({ dezenas: a.dezenas }))}
+                maxNumber={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.numberRange || 60}
+              />
+            )}
 
             {/* AI Suggestions */}
             {suggestionsData && (
