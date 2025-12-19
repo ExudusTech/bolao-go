@@ -19,6 +19,8 @@ export type Database = {
           apelido: string
           bolao_id: string
           celular: string
+          celular_hash: string | null
+          celular_ultimos4: string | null
           created_at: string
           data_registro: string | null
           dezenas: number[]
@@ -33,6 +35,8 @@ export type Database = {
           apelido: string
           bolao_id: string
           celular: string
+          celular_hash?: string | null
+          celular_ultimos4?: string | null
           created_at?: string
           data_registro?: string | null
           dezenas: number[]
@@ -47,6 +51,8 @@ export type Database = {
           apelido?: string
           bolao_id?: string
           celular?: string
+          celular_hash?: string | null
+          celular_ultimos4?: string | null
           created_at?: string
           data_registro?: string | null
           dezenas?: number[]
@@ -214,6 +220,51 @@ export type Database = {
           },
         ]
       }
+      participant_sessions: {
+        Row: {
+          apelido: string
+          aposta_id: string
+          bolao_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+        }
+        Insert: {
+          apelido: string
+          aposta_id: string
+          bolao_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token: string
+        }
+        Update: {
+          apelido?: string
+          aposta_id?: string
+          bolao_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "participant_sessions_aposta_id_fkey"
+            columns: ["aposta_id"]
+            isOneToOne: false
+            referencedRelation: "apostas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "participant_sessions_bolao_id_fkey"
+            columns: ["bolao_id"]
+            isOneToOne: false
+            referencedRelation: "boloes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -258,14 +309,28 @@ export type Database = {
           total_apostas: number
         }[]
       }
+      get_bolao_messages: {
+        Args: { p_bolao_id: string; p_token: string }
+        Returns: Json
+      }
       is_bolao_participant: {
         Args: { p_bolao_id: string; p_celular: string }
         Returns: boolean
+      }
+      participant_login: {
+        Args: { p_apelido: string; p_bolao_id: string; p_senha: string }
+        Returns: Json
+      }
+      participant_logout: { Args: { p_token: string }; Returns: Json }
+      send_participant_message: {
+        Args: { p_bolao_id: string; p_content: string; p_token: string }
+        Returns: Json
       }
       upload_receipt: {
         Args: { p_aposta_id: string; p_celular: string; p_receipt_url: string }
         Returns: boolean
       }
+      validate_participant_token: { Args: { p_token: string }; Returns: Json }
     }
     Enums: {
       [_ in never]: never
