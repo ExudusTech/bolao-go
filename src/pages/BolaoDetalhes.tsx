@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria, SkippedGame } from "@/components/bolao/GameSuggestions";
+import { GameSelectionDialog } from "@/components/bolao/GameSelectionDialog";
 import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
@@ -56,6 +57,12 @@ interface SuggestionsData {
   availableBudget: number;
 }
 
+interface GameSelection {
+  size: number;
+  criteria: "mais_votados" | "menos_votados" | "nao_votados" | "misto";
+  quantity: number;
+}
+
 export default function BolaoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const [bolao, setBolao] = useState<Bolao | null>(null);
@@ -67,6 +74,7 @@ export default function BolaoDetalhes() {
   const [loadingMoreSuggestions, setLoadingMoreSuggestions] = useState(false);
   const [savingGames, setSavingGames] = useState(false);
   const [suggestionsData, setSuggestionsData] = useState<SuggestionsData | null>(null);
+  const [showSelectionDialog, setShowSelectionDialog] = useState(false);
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -144,14 +152,18 @@ export default function BolaoDetalhes() {
     toast.success(`${paidApostas.length} apostas pagas exportadas!`);
   };
 
-  const handleGetSuggestions = async () => {
+  const handleOpenSelectionDialog = () => {
     if (paidApostas.length === 0) {
       toast.error("É necessário ter apostas pagas para gerar sugestões");
       return;
     }
+    setShowSelectionDialog(true);
+  };
 
+  const handleConfirmSelections = async (selections: GameSelection[]) => {
     setLoadingSuggestions(true);
     setSuggestionsData(null);
+    setShowSelectionDialog(false);
 
     const apostasParaIA = paidApostas.map(a => ({
       apelido: a.apelido,
@@ -172,6 +184,7 @@ export default function BolaoDetalhes() {
           totalArrecadado,
           lotteryConfig,
           apostas: apostasParaIA,
+          gameSelections: selections,
         }),
       });
 
@@ -485,7 +498,7 @@ export default function BolaoDetalhes() {
                   </Button>
                   <Button 
                     size="sm" 
-                    onClick={handleGetSuggestions} 
+                    onClick={handleOpenSelectionDialog} 
                     disabled={loadingSuggestions || paidApostas.length === 0}
                     className="hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
                   >
@@ -569,6 +582,19 @@ export default function BolaoDetalhes() {
           </div>
         </main>
       </div>
+
+      {/* Game Selection Dialog */}
+      {bolao && (
+        <GameSelectionDialog
+          open={showSelectionDialog}
+          onOpenChange={setShowSelectionDialog}
+          totalBudget={totalArrecadado}
+          individualGamesCost={paidApostas.length * (LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices[6] || 6)}
+          prices={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices || {}}
+          onConfirm={handleConfirmSelections}
+          isLoading={loadingSuggestions}
+        />
+      )}
     </AuthGuard>
   );
 }

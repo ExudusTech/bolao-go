@@ -455,7 +455,8 @@ serve(async (req) => {
       excludeIds = [], 
       alreadySelectedCost = 0,
       customRequest,
-      existingGameNumbers = []
+      existingGameNumbers = [],
+      gameSelections,
     } = body as {
       totalArrecadado: number;
       lotteryConfig: LotteryConfig;
@@ -467,6 +468,11 @@ serve(async (req) => {
         criteria: "mais_votados" | "menos_votados" | "nao_votados" | "misto";
       };
       existingGameNumbers?: number[][];
+      gameSelections?: Array<{
+        size: number;
+        criteria: "mais_votados" | "menos_votados" | "nao_votados" | "misto";
+        quantity: number;
+      }>;
     };
 
     console.log(`Request received: ${apostas.length} apostas, budget R$ ${totalArrecadado}`);
@@ -548,7 +554,137 @@ serve(async (req) => {
       );
     }
     
-    // Regular suggestions generation
+    // Handle specific game selections from user
+    if (gameSelections && gameSelections.length > 0) {
+      console.log(`Processing ${gameSelections.length} game selection types`);
+      
+      const suggestions: SuggestedGame[] = [];
+      const skippedGames: SkippedGame[] = [];
+      let gameIndex = 1;
+      
+      // Track used numbers by category
+      const usedNumbersByCategory: Record<string, Set<number>> = {
+        mais_votados: new Set(),
+        menos_votados: new Set(),
+        nao_votados: new Set(),
+        misto: new Set(),
+      };
+      
+      // Get ranked numbers
+      const rankedMostVoted = analysis.fullRanking.filter(e => e.count > 0);
+      const rankedLeastVoted = [...rankedMostVoted].sort((a, b) => {
+        if (a.count !== b.count) return a.count - b.count;
+        return a.number - b.number;
+      });
+      
+      for (const selection of gameSelections) {
+        const { size, criteria, quantity } = selection;
+        const price = lotteryConfig.prices[size];
+        
+        if (!price) continue;
+        
+        for (let i = 0; i < quantity; i++) {
+          let numbers: number[] | null = null;
+          let reason = '';
+          
+          if (criteria === 'mais_votados') {
+            const startIdx = usedNumbersByCategory.mais_votados.size;
+            const available = rankedMostVoted
+              .slice(startIdx, startIdx + size)
+              .map(e => e.number);
+            
+            if (available.length >= size) {
+              numbers = available.slice(0, size);
+              const start = startIdx + 1;
+              const end = start + size - 1;
+              reason = `Jogo com ${size} números MAIS VOTADOS (ranking ${start}º ao ${end}º)`;
+            }
+          } else if (criteria === 'menos_votados') {
+            const startIdx = usedNumbersByCategory.menos_votados.size;
+            const available = rankedLeastVoted
+              .slice(startIdx, startIdx + size)
+              .map(e => e.number);
+            
+            if (available.length >= size) {
+              numbers = available.slice(0, size);
+              const start = startIdx + 1;
+              const end = start + size - 1;
+              reason = `Jogo com ${size} números MENOS VOTADOS (ranking ${start}º ao ${end}º)`;
+            }
+          } else if (criteria === 'nao_votados') {
+            const available = analysis.notVoted
+              .filter(n => !usedNumbersByCategory.nao_votados.has(n));
+            
+            if (available.length >= size) {
+              numbers = available.slice(0, size);
+              reason = `Jogo com ${size} números NÃO VOTADOS`;
+            }
+          } else if (criteria === 'misto') {
+            const halfSize = Math.ceil(size / 2);
+            const usedInMisto = usedNumbersByCategory.misto;
+            
+            const fromMost = rankedMostVoted
+              .filter(e => !usedInMisto.has(e.number))
+              .slice(0, halfSize)
+              .map(e => e.number);
+            
+            const fromLeast = rankedLeastVoted
+              .filter(e => !usedInMisto.has(e.number) && !fromMost.includes(e.number))
+              .slice(0, size - fromMost.length)
+              .map(e => e.number);
+            
+            const combined = [...fromMost, ...fromLeast];
+            if (combined.length >= size) {
+              numbers = combined.slice(0, size);
+              reason = `Jogo MISTO com ${size} números (mais e menos votados)`;
+            }
+          }
+          
+          if (numbers && numbers.length === size) {
+            const sortedNumbers = [...numbers].sort((a, b) => a - b);
+            const gameKey = sortedNumbers.join(',');
+            
+            if (!existingGames.has(gameKey)) {
+              numbers.forEach(n => usedNumbersByCategory[criteria].add(n));
+              existingGames.add(gameKey);
+              
+              suggestions.push({
+                id: `suggestion-${gameIndex}`,
+                numbers: sortedNumbers,
+                cost: price,
+                type: `${size} dezenas`,
+                reason,
+                categoria: criteria,
+              });
+              
+              gameIndex++;
+              console.log(`Generated ${criteria} game: ${size} numbers, R$ ${price.toFixed(2)}`);
+            }
+          } else {
+            console.log(`Could not generate ${criteria} game: ${size} numbers - not enough available numbers`);
+          }
+        }
+      }
+      
+      console.log(`Generated ${suggestions.length} games from user selections`);
+      
+      return new Response(
+        JSON.stringify({
+          analysis: {
+            mostVoted: analysis.mostVoted,
+            leastVoted: analysis.leastVoted,
+            notVoted: analysis.notVoted,
+          },
+          suggestions,
+          skippedGames,
+          individualGamesCost,
+          availableBudget: totalArrecadado - individualGamesCost,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Regular suggestions generation (automatic mode)
     const { suggestions, skippedGames } = generateGameSuggestions(
       availableBudget,
       analysis,
