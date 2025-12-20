@@ -14,11 +14,16 @@ import { CollapsibleSection } from "@/components/ui/collapsible-section";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, MessageSquare, Table, Grid3X3 } from "lucide-react";
+import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, MessageSquare, Table, Grid3X3, CalendarIcon, Clock, X } from "lucide-react";
 import { LOTTERY_TYPES } from "@/lib/validations";
+import { format, isPast } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface Bolao {
   id: string;
@@ -33,6 +38,7 @@ interface Bolao {
   numeros_sorteados: number[] | null;
   resultado_verificado: boolean | null;
   encerrado: boolean;
+  data_limite_apostas: string | null;
 }
 
 interface Aposta {
@@ -81,6 +87,8 @@ export default function BolaoDetalhes() {
   const [showSelectionDialog, setShowSelectionDialog] = useState(false);
   const [togglingEncerrado, setTogglingEncerrado] = useState(false);
 
+  const [updatingDeadline, setUpdatingDeadline] = useState(false);
+
   const fetchData = useCallback(async () => {
     if (!id) return;
 
@@ -93,6 +101,7 @@ export default function BolaoDetalhes() {
       setBolao({
         ...bolaoRes.data,
         encerrado: bolaoRes.data.encerrado ?? false,
+        data_limite_apostas: bolaoRes.data.data_limite_apostas ?? null,
       });
     }
 
@@ -146,6 +155,27 @@ export default function BolaoDetalhes() {
     }
     
     setTogglingEncerrado(false);
+  };
+
+  const handleUpdateDeadline = async (date: Date | undefined) => {
+    if (!bolao) return;
+    
+    setUpdatingDeadline(true);
+    const newDeadline = date ? date.toISOString() : null;
+    
+    const { error } = await supabase
+      .from("boloes")
+      .update({ data_limite_apostas: newDeadline })
+      .eq("id", bolao.id);
+    
+    if (error) {
+      toast.error("Erro ao atualizar data limite");
+    } else {
+      setBolao({ ...bolao, data_limite_apostas: newDeadline });
+      toast.success(date ? "Data limite atualizada!" : "Data limite removida!");
+    }
+    
+    setUpdatingDeadline(false);
   };
 
   const handleExportCSV = () => {
@@ -530,6 +560,62 @@ export default function BolaoDetalhes() {
                       </div>
                     </div>
                   )}
+                  <div className="flex items-start gap-2">
+                    <Clock className="h-4 w-4 mt-1 text-muted-foreground shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">Data Limite para Apostas</p>
+                      <div className="flex items-center gap-2">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={cn(
+                                "justify-start text-left font-normal h-8",
+                                !bolao.data_limite_apostas && "text-muted-foreground"
+                              )}
+                              disabled={updatingDeadline}
+                            >
+                              {updatingDeadline ? (
+                                <Loader2 className="h-3 w-3 animate-spin mr-2" />
+                              ) : (
+                                <CalendarIcon className="h-3 w-3 mr-2" />
+                              )}
+                              {bolao.data_limite_apostas ? (
+                                format(new Date(bolao.data_limite_apostas), "dd/MM/yyyy", { locale: ptBR })
+                              ) : (
+                                "Definir"
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={bolao.data_limite_apostas ? new Date(bolao.data_limite_apostas) : undefined}
+                              onSelect={handleUpdateDeadline}
+                              locale={ptBR}
+                              disabled={(date) => date < new Date()}
+                              className="pointer-events-auto"
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {bolao.data_limite_apostas && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleUpdateDeadline(undefined)}
+                            disabled={updatingDeadline}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                        {bolao.data_limite_apostas && isPast(new Date(bolao.data_limite_apostas)) && (
+                          <Badge variant="destructive" className="text-xs">Expirado</Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="p-3 rounded-lg bg-muted/50 border">
