@@ -27,10 +27,6 @@ interface SessionBet {
   receiptUploaded: boolean;
 }
 
-interface OtherAposta {
-  dezenas: number[];
-}
-
 export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess }: BetFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -42,7 +38,6 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
   const [uploadingBetId, setUploadingBetId] = useState<string | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [showOthersNumbers, setShowOthersNumbers] = useState(false);
-  const [otherApostas, setOtherApostas] = useState<OtherAposta[]>([]);
   const [loadingOthers, setLoadingOthers] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -214,29 +209,38 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
     event.target.value = '';
   };
 
-  // Compute which numbers are already chosen by others
-  const othersChosenNumbers = useMemo(() => {
-    const numberCounts: Record<number, number> = {};
-    otherApostas.forEach(aposta => {
-      aposta.dezenas.forEach(num => {
-        numberCounts[num] = (numberCounts[num] || 0) + 1;
-      });
-    });
-    return numberCounts;
-  }, [otherApostas]);
+  // State for others' number counts (fetched from RPC)
+  const [othersNumberCounts, setOthersNumberCounts] = useState<Record<number, number>>({});
 
   // Fetch other apostas when toggle is turned on
   useEffect(() => {
-    if (showOthersNumbers && otherApostas.length === 0 && !loadingOthers) {
+    if (showOthersNumbers && Object.keys(othersNumberCounts).length === 0 && !loadingOthers) {
       const fetchOthers = async () => {
         setLoadingOthers(true);
-        // For demonstration - this would need an RPC function to get others' numbers
-        // Since apostas RLS only allows gestors, we leave this as a placeholder
+        try {
+          const { data, error } = await supabase.rpc("get_bolao_number_counts", {
+            p_bolao_id: bolaoId
+          });
+          
+          if (!error && data) {
+            const result = data as { success: boolean; counts?: Record<string, number> };
+            if (result.success && result.counts) {
+              // Convert string keys to numbers
+              const counts: Record<number, number> = {};
+              Object.entries(result.counts).forEach(([key, value]) => {
+                counts[parseInt(key, 10)] = value;
+              });
+              setOthersNumberCounts(counts);
+            }
+          }
+        } catch (err) {
+          console.error("Error fetching number counts:", err);
+        }
         setLoadingOthers(false);
       };
       fetchOthers();
     }
-  }, [showOthersNumbers, otherApostas.length, loadingOthers, bolaoId]);
+  }, [showOthersNumbers, othersNumberCounts, loadingOthers, bolaoId]);
 
   // Number grid sub-component with highlight support
   const NumberGridWithHighlight = ({ 
@@ -484,21 +488,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                     type="button"
                     variant={showOthersNumbers ? "secondary" : "outline"}
                     size="sm"
-                    onClick={async () => {
-                      if (!showOthersNumbers && otherApostas.length === 0) {
-                        setLoadingOthers(true);
-                        // Fetch other participants' numbers
-                        const { data } = await supabase.rpc("get_bolao_for_participation", {
-                          bolao_id: bolaoId
-                        });
-                        if (data && data.length > 0) {
-                          // We need a separate way to get apostas
-                          // For now, we'll use the public access
-                        }
-                        setLoadingOthers(false);
-                      }
-                      setShowOthersNumbers(!showOthersNumbers);
-                    }}
+                    onClick={() => setShowOthersNumbers(!showOthersNumbers)}
                     className="h-7 text-xs gap-1"
                     disabled={loadingOthers}
                   >
@@ -544,7 +534,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
               <NumberGridWithHighlight
                 numbers={numbers}
                 selectedNumbers={selectedNumbers}
-                othersChosen={othersChosenNumbers}
+                othersChosen={othersNumberCounts}
                 showHighlight={showOthersNumbers}
                 onNumberClick={handleNumberClick}
                 disabled={isLoading}
