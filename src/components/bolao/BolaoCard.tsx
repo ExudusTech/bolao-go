@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Users, ExternalLink, Copy } from "lucide-react";
 import { toast } from "sonner";
-import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
-import { cn } from "@/lib/utils";
+import { getBolaoStatus } from "@/lib/bolao-status";
+import { BolaoProgressBar } from "./BolaoProgressBar";
 
 interface BolaoCardProps {
   id: string;
@@ -76,14 +76,8 @@ export function BolaoCard({
             <span className="font-semibold animate-count">{totalApostas}</span>
           </Badge>
         </div>
-        {/* Status Badge */}
-        <Badge 
-          variant="outline"
-          className={cn("mt-2 text-xs font-medium", getStatusBadgeClasses(statusInfo.variant))}
-        >
-          <span className="mr-1">{statusInfo.icon}</span>
-          {statusInfo.label}
-        </Badge>
+        {/* Progress Bar */}
+        <BolaoProgressBar statusInfo={statusInfo} className="mt-3" />
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
