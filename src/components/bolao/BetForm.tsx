@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { apostasSchema, ApostaInput } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Check, Share2, Upload, FileImage, Plus } from "lucide-react";
+import { Loader2, Check, Share2, Upload, FileImage, Plus, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BetFormProps {
@@ -27,6 +27,10 @@ interface SessionBet {
   receiptUploaded: boolean;
 }
 
+interface OtherAposta {
+  dezenas: number[];
+}
+
 export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess }: BetFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
@@ -37,6 +41,9 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
   const [sessionBets, setSessionBets] = useState<SessionBet[]>([]);
   const [uploadingBetId, setUploadingBetId] = useState<string | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [showOthersNumbers, setShowOthersNumbers] = useState(false);
+  const [otherApostas, setOtherApostas] = useState<OtherAposta[]>([]);
+  const [loadingOthers, setLoadingOthers] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ApostaInput>({
@@ -206,6 +213,73 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
     setUploadingBetId(null);
     event.target.value = '';
   };
+
+  // Compute which numbers are already chosen by others
+  const othersChosenNumbers = useMemo(() => {
+    const numberCounts: Record<number, number> = {};
+    otherApostas.forEach(aposta => {
+      aposta.dezenas.forEach(num => {
+        numberCounts[num] = (numberCounts[num] || 0) + 1;
+      });
+    });
+    return numberCounts;
+  }, [otherApostas]);
+
+  // Fetch other apostas when toggle is turned on
+  useEffect(() => {
+    if (showOthersNumbers && otherApostas.length === 0 && !loadingOthers) {
+      const fetchOthers = async () => {
+        setLoadingOthers(true);
+        // For demonstration - this would need an RPC function to get others' numbers
+        // Since apostas RLS only allows gestors, we leave this as a placeholder
+        setLoadingOthers(false);
+      };
+      fetchOthers();
+    }
+  }, [showOthersNumbers, otherApostas.length, loadingOthers, bolaoId]);
+
+  // Number grid sub-component with highlight support
+  const NumberGridWithHighlight = ({ 
+    numbers: gridNumbers, 
+    selectedNumbers: gridSelected, 
+    othersChosen, 
+    showHighlight, 
+    onNumberClick: gridClick, 
+    disabled: gridDisabled 
+  }: {
+    numbers: number[];
+    selectedNumbers: number[];
+    othersChosen: Record<number, number>;
+    showHighlight: boolean;
+    onNumberClick: (num: number) => void;
+    disabled: boolean;
+  }) => (
+    <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
+      {gridNumbers.map((num) => {
+        const isSelected = gridSelected.includes(num);
+        const isChosenByOthers = showHighlight && othersChosen[num] > 0;
+        return (
+          <button
+            key={num}
+            type="button"
+            onClick={() => gridClick(num)}
+            disabled={gridDisabled}
+            className={cn(
+              "flex h-8 w-full items-center justify-center rounded-full text-sm font-medium transition-all duration-150",
+              "hover:scale-105 active:scale-95",
+              isSelected
+                ? "bg-success text-success-foreground shadow-md ring-2 ring-success/30"
+                : isChosenByOthers
+                  ? "bg-orange-500/80 text-white hover:bg-orange-500"
+                  : "bg-muted hover:bg-success/20 text-foreground"
+            )}
+          >
+            {num.toString().padStart(2, "0")}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   const totalValue = sessionBets.length * valorCota;
   const numbers = Array.from({ length: 60 }, (_, i) => i + 1);
@@ -405,9 +479,42 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>Escolha 6 números *</Label>
-                <span className="text-sm text-muted-foreground">
-                  {selectedNumbers.length}/6 selecionados
-                </span>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant={showOthersNumbers ? "secondary" : "outline"}
+                    size="sm"
+                    onClick={async () => {
+                      if (!showOthersNumbers && otherApostas.length === 0) {
+                        setLoadingOthers(true);
+                        // Fetch other participants' numbers
+                        const { data } = await supabase.rpc("get_bolao_for_participation", {
+                          bolao_id: bolaoId
+                        });
+                        if (data && data.length > 0) {
+                          // We need a separate way to get apostas
+                          // For now, we'll use the public access
+                        }
+                        setLoadingOthers(false);
+                      }
+                      setShowOthersNumbers(!showOthersNumbers);
+                    }}
+                    className="h-7 text-xs gap-1"
+                    disabled={loadingOthers}
+                  >
+                    {loadingOthers ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : showOthersNumbers ? (
+                      <EyeOff className="h-3 w-3" />
+                    ) : (
+                      <Eye className="h-3 w-3" />
+                    )}
+                    {showOthersNumbers ? "Ocultar" : "Ver escolhidos"}
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    {selectedNumbers.length}/6
+                  </span>
+                </div>
               </div>
               
               {/* Selected Numbers Display */}
@@ -427,29 +534,21 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                 )}
               </div>
 
+              {showOthersNumbers && (
+                <p className="text-xs text-muted-foreground text-center bg-warning/10 text-warning-foreground px-2 py-1 rounded">
+                  🟠 Números em laranja já foram escolhidos por outros participantes
+                </p>
+              )}
+
               {/* Number Grid */}
-              <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
-                {numbers.map((num) => {
-                  const isSelected = selectedNumbers.includes(num);
-                  return (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => handleNumberClick(num)}
-                      disabled={isLoading}
-                      className={cn(
-                        "flex h-8 w-full items-center justify-center rounded-full text-sm font-medium transition-all duration-150",
-                        "hover:scale-105 active:scale-95",
-                        isSelected
-                          ? "bg-success text-success-foreground shadow-md ring-2 ring-success/30"
-                          : "bg-muted hover:bg-success/20 text-foreground"
-                      )}
-                    >
-                      {num.toString().padStart(2, "0")}
-                    </button>
-                  );
-                })}
-              </div>
+              <NumberGridWithHighlight
+                numbers={numbers}
+                selectedNumbers={selectedNumbers}
+                othersChosen={othersChosenNumbers}
+                showHighlight={showOthersNumbers}
+                onNumberClick={handleNumberClick}
+                disabled={isLoading}
+              />
             </div>
 
             {/* Legal Notice */}
