@@ -10,6 +10,7 @@ import CriarBolao from "./pages/CriarBolao";
 import BolaoDetalhes from "./pages/BolaoDetalhes";
 import Participar from "./pages/Participar";
 import ParticipantLogin from "./pages/ParticipantLogin";
+import ParticipanteDashboard from "./pages/ParticipanteDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/participar/:id" element={<Participar />} />
           <Route path="/participar/:id/login" element={<ParticipantLogin />} />
           <Route path="/participar/:id/cadastro" element={<Participar />} />
+          <Route path="/participante" element={<ParticipanteDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

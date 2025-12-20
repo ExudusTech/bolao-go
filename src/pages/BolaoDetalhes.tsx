@@ -6,6 +6,7 @@ import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria, SkippedGame } from "@/components/bolao/GameSuggestions";
 import { GameSelectionDialog } from "@/components/bolao/GameSelectionDialog";
 import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis";
+import { NumbersGrid } from "@/components/bolao/NumbersGrid";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
 import { LotteryResultsChecker } from "@/components/bolao/LotteryResultsChecker";
@@ -16,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, MessageSquare, Table } from "lucide-react";
+import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, MessageSquare, Table, Grid3X3 } from "lucide-react";
 import { LOTTERY_TYPES } from "@/lib/validations";
 
 interface Bolao {
@@ -617,6 +618,23 @@ export default function BolaoDetalhes() {
               </CardContent>
             </Card>
 
+            {/* Numbers Grid - Visual Overview */}
+            {apostas.length > 0 && (
+              <CollapsibleSection
+                title="Mapa de Números Escolhidos"
+                description={`Visualização de todos os ${apostas.length} números apostados`}
+                icon={<Grid3X3 className="h-5 w-5" />}
+                variant="accent"
+                defaultOpen={true}
+              >
+                <NumbersGrid 
+                  apostas={apostas.map(a => ({ dezenas: a.dezenas }))}
+                  maxNumber={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.numberRange || 60}
+                  showCounts={true}
+                />
+              </CollapsibleSection>
+            )}
+
             {/* Number Ranking Analysis - Collapsible */}
             {paidApostas.length > 0 && (
               <CollapsibleSection
@@ -624,7 +642,7 @@ export default function BolaoDetalhes() {
                 description={`Ranking baseado em ${paidApostas.length} apostas pagas`}
                 icon={<BarChart3 className="h-5 w-5" />}
                 variant="primary"
-                defaultOpen={true}
+                defaultOpen={false}
               >
                 <NumberRankingAnalysis 
                   apostas={paidApostas.map(a => ({ dezenas: a.dezenas }))}
