@@ -13,6 +13,10 @@ interface Bolao {
   nome_do_bolao: string;
   total_apostas: number;
   created_at: string;
+  encerrado: boolean;
+  data_sorteio: string | null;
+  numeros_sorteados: number[] | null;
+  resultado_verificado: boolean;
 }
 
 export default function Dashboard() {
@@ -29,7 +33,7 @@ export default function Dashboard() {
   const fetchBoloes = async () => {
     const { data, error } = await supabase
       .from("boloes")
-      .select("id, nome_do_bolao, total_apostas, created_at")
+      .select("id, nome_do_bolao, total_apostas, created_at, encerrado, data_sorteio, numeros_sorteados, resultado_verificado")
       .eq("gestor_id", user?.id)
       .order("created_at", { ascending: false });
 
@@ -92,6 +96,10 @@ export default function Dashboard() {
                     totalApostas={bolao.total_apostas}
                     createdAt={bolao.created_at}
                     index={index}
+                    encerrado={bolao.encerrado}
+                    dataSorteio={bolao.data_sorteio}
+                    numerosSorteados={bolao.numeros_sorteados}
+                    resultadoVerificado={bolao.resultado_verificado}
                   />
                 ))}
               </div>
