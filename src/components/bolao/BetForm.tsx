@@ -79,20 +79,26 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     }
 
     setIsLoading(true);
-    
+
     const apelido = participantInfo?.apelido || data.apelido.trim();
-    const celular = participantInfo?.celular || data.celular.trim();
-    
-    const { data: insertedData, error } = await supabase.from("apostas").insert({
+    // `data.celular` já chega normalizado (somente dígitos) via zod transform
+    const celular = participantInfo?.celular || data.celular;
+
+    // Gerar ID no client para não depender de RETURNING/SELECT (evita conflito com RLS)
+    const apostaId = crypto.randomUUID();
+
+    const { error } = await supabase.from("apostas").insert({
+      id: apostaId,
       bolao_id: bolaoId,
       apelido,
       celular,
       dezenas: selectedNumbers,
-    }).select("id").single();
+    });
 
     setIsLoading(false);
 
-    if (error || !insertedData) {
+    if (error) {
+      console.error("[BetForm] Falha ao registrar aposta:", error.message);
       toast.error("Erro ao registrar aposta. Tente novamente.");
       return;
     }
@@ -106,9 +112,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     if (!participantInfo) {
       setParticipantInfo({ apelido, celular });
     }
-    
     // Track bet in session with ID
-    setSessionBets(prev => [...prev, { id: insertedData.id, numbers: [...selectedNumbers], receiptUploaded: false }]);
+    setSessionBets(prev => [...prev, { id: apostaId, numbers: [...selectedNumbers], receiptUploaded: false }]);
     
     setHasSubmittedBet(true);
     setSelectedNumbers([]);
