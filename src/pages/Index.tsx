@@ -40,21 +40,20 @@ export default function Index() {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Hero Section - Caixa style gradient */}
+      {/* Hero Section - Mobile optimized */}
       <section className="relative overflow-hidden bg-caixa-gradient">
-        <div className="container relative py-20 md:py-32">
+        <div className="container relative py-12 px-4 sm:py-20 md:py-32">
           <div className="mx-auto max-w-3xl text-center animate-fade-in">
-            <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-6xl">
+            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl md:text-5xl lg:text-6xl leading-tight">
               Organize seus bolões da{" "}
-              <span className="text-accent">Mega-Sena</span>
+              <span className="text-accent block sm:inline">Mega-Sena</span>
             </h1>
-            <p className="mt-6 text-lg text-white/90 md:text-xl">
-              Crie bolões, gere links públicos e receba apostas de forma simples e organizada. 
-              Sem complicação, sem burocracia.
+            <p className="mt-4 sm:mt-6 text-base sm:text-lg text-white/90 md:text-xl px-2">
+              Crie bolões, gere links públicos e receba apostas de forma simples e organizada.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="mt-8 sm:mt-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-center sm:gap-4 px-4 sm:px-0">
               {user ? (
-                <Button size="lg" asChild className="hover-scale text-base px-8 bg-accent text-accent-foreground hover:bg-accent/90">
+                <Button size="lg" asChild className="w-full sm:w-auto hover-scale text-base px-8 bg-accent text-accent-foreground hover:bg-accent/90">
                   <Link to="/gestor/dashboard">
                     Ir para o Dashboard
                     <ArrowRight className="ml-2 h-5 w-5" />
@@ -62,13 +61,13 @@ export default function Index() {
                 </Button>
               ) : (
                 <>
-                  <Button size="lg" asChild className="hover-scale text-base px-8 bg-accent text-accent-foreground hover:bg-accent/90">
+                  <Button size="lg" asChild className="w-full sm:w-auto hover-scale text-base px-8 bg-accent text-accent-foreground hover:bg-accent/90">
                     <Link to="/auth?tab=register">
                       Começar Gratuitamente
                       <ArrowRight className="ml-2 h-5 w-5" />
                     </Link>
                   </Button>
-                  <Button size="lg" variant="outline" asChild className="hover-scale text-base border-white/30 text-white hover:bg-white/10 hover:text-white">
+                  <Button size="lg" variant="outline" asChild className="w-full sm:w-auto hover-scale text-base border-white/30 text-white hover:bg-white/10 hover:text-white">
                     <Link to="/auth">
                       Já tenho conta
                     </Link>
@@ -80,32 +79,32 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="container py-16 md:py-24">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+      {/* Features Section - Mobile optimized */}
+      <section className="container py-12 px-4 sm:py-16 md:py-24">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl">
             Tudo que você precisa
           </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
+          <p className="mt-3 sm:mt-4 text-base sm:text-lg text-muted-foreground px-2">
             Funcionalidades pensadas para facilitar a organização dos seus bolões
           </p>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => (
             <Card 
               key={feature.title}
               className="group transition-all duration-200 hover:shadow-lg hover:border-primary/20 animate-slide-up"
               style={{ animationDelay: `${index * 100}ms` }}
             >
-              <CardHeader>
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                  <feature.icon className="h-6 w-6" />
+              <CardHeader className="pb-2 sm:pb-4">
+                <div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <feature.icon className="h-5 w-5 sm:h-6 sm:w-6" />
                 </div>
-                <CardTitle className="text-lg">{feature.title}</CardTitle>
+                <CardTitle className="text-base sm:text-lg">{feature.title}</CardTitle>
               </CardHeader>
-              <CardContent>
-                <CardDescription className="text-base">
+              <CardContent className="pt-0">
+                <CardDescription className="text-sm sm:text-base">
                   {feature.description}
                 </CardDescription>
               </CardContent>
@@ -114,26 +113,26 @@ export default function Index() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* CTA Section - Mobile optimized */}
       <section className="border-t bg-muted/30">
-        <div className="container py-16 md:py-24">
+        <div className="container py-12 px-4 sm:py-16 md:py-24">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight md:text-4xl">
               Pronto para começar?
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
+            <p className="mt-3 sm:mt-4 text-base sm:text-lg text-muted-foreground px-2">
               Crie sua conta gratuitamente e organize seu primeiro bolão em menos de 1 minuto.
             </p>
-            <div className="mt-8">
+            <div className="mt-6 sm:mt-8 px-4 sm:px-0">
               {user ? (
-                <Button size="lg" asChild className="hover-scale">
+                <Button size="lg" asChild className="w-full sm:w-auto hover-scale">
                   <Link to="/bolao/criar">
                     Criar Novo Bolão
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Link>
                 </Button>
               ) : (
-                <Button size="lg" asChild className="hover-scale">
+                <Button size="lg" asChild className="w-full sm:w-auto hover-scale">
                   <Link to="/auth?tab=register">
                     Criar Conta Grátis
                     <ArrowRight className="ml-2 h-5 w-5" />
