@@ -60,16 +60,20 @@ export default function Participar() {
   const handleSuccess = async (apelido: string, celular: string) => {
     setCounter((prev) => prev + 1);
     
+    // Extract last 4 digits from phone number (format: CC:digits)
+    const parts = celular.split(':');
+    const digits = parts.length === 2 ? parts[1] : celular.replace(/\D/g, '');
+    const last4 = digits.slice(-4);
+    
     // If not logged in, auto-login after first bet
-    if (!session && id && apelido && celular) {
+    if (!session && id && apelido && last4) {
       setIsLoggingIn(true);
-      const senha = celular.slice(-4); // Last 4 digits
-      const result = await login(id, apelido, senha);
+      const result = await login(id, apelido, last4);
       setIsLoggingIn(false);
       
       if (result.success) {
         toast.success("Aposta registrada e login realizado!", {
-          description: `Para acessar novamente, use seu apelido e os 4 últimos dígitos do celular (${celular.slice(-4)}) como senha.`,
+          description: `Para acessar novamente, use seu apelido e os 4 últimos dígitos do celular (${last4}) como senha.`,
           duration: 8000,
         });
       } else {
