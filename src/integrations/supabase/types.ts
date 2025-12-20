@@ -309,6 +309,7 @@ export type Database = {
         Returns: {
           chave_pix: string
           created_at: string
+          data_limite_apostas: string
           encerrado: boolean
           gestor_name: string
           id: string
