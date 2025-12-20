@@ -297,6 +297,7 @@ export default function Participar() {
             valorCota={paymentInfo?.valor_cota || bolao.valor_cota}
             onSuccess={handleSuccess}
             isAuthenticated={!!session}
+            isLoggingIn={isLoggingIn}
           />
 
           {/* Messages Panel */}

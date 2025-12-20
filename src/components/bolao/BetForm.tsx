@@ -20,6 +20,7 @@ interface BetFormProps {
   valorCota: number;
   onSuccess: (apelido: string, celular: string) => void;
   isAuthenticated?: boolean;
+  isLoggingIn?: boolean;
 }
 
 interface SessionBet {
@@ -28,7 +29,7 @@ interface SessionBet {
   receiptUploaded: boolean;
 }
 
-export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess, isAuthenticated }: BetFormProps) {
+export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess, isAuthenticated, isLoggingIn }: BetFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [shakeForm, setShakeForm] = useState(false);
@@ -412,10 +413,20 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
             <div className="flex flex-col gap-3">
               <Button
                 onClick={handleNewBet}
+                disabled={isLoggingIn}
                 className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
               >
-                <Plus className="h-5 w-5 mr-2" />
-                +1 Cota
+                {isLoggingIn ? (
+                  <>
+                    <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                    Finalizando login...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-5 w-5 mr-2" />
+                    +1 Cota
+                  </>
+                )}
               </Button>
               
               <Button
