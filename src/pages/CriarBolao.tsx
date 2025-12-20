@@ -13,11 +13,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { createBolaoSchema, CreateBolaoInput, LOTTERY_TYPES } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Loader2, Copy, Check, ArrowLeft, CalendarIcon } from "lucide-react";
+import { Loader2, Copy, Check, ArrowLeft, CalendarIcon, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -31,6 +41,8 @@ export default function CriarBolao() {
   const [copied, setCopied] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [permiteRepeticao, setPermiteRepeticao] = useState(true);
+  const [showPriceConfirmation, setShowPriceConfirmation] = useState(false);
+  const [pendingFormData, setPendingFormData] = useState<CreateBolaoInput | null>(null);
 
   const form = useForm<CreateBolaoInput>({
     resolver: zodResolver(createBolaoSchema),
@@ -45,10 +57,18 @@ export default function CriarBolao() {
     },
   });
 
-  const handleSubmit = async (data: CreateBolaoInput) => {
+  const handleFormSubmit = (data: CreateBolaoInput) => {
     if (!user) return;
+    setPendingFormData(data);
+    setShowPriceConfirmation(true);
+  };
 
+  const handleConfirmAndCreate = async () => {
+    if (!user || !pendingFormData) return;
+
+    setShowPriceConfirmation(false);
     setIsLoading(true);
+    const data = pendingFormData;
 
     const { data: bolao, error } = await supabase
       .from("boloes")
@@ -113,7 +133,7 @@ export default function CriarBolao() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                  <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="nome">Nome do Bolão *</Label>
                       <Input
@@ -334,6 +354,48 @@ export default function CriarBolao() {
             )}
           </div>
         </main>
+
+        <AlertDialog open={showPriceConfirmation} onOpenChange={setShowPriceConfirmation}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                Confirmar Valores da Mega-Sena
+              </AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    Antes de criar o bolão, confirme se os valores oficiais da Mega-Sena ainda são estes:
+                  </p>
+                  <div className="bg-muted rounded-lg p-3 space-y-1 font-mono text-sm">
+                    {Object.entries(LOTTERY_TYPES.megasena.prices)
+                      .slice(0, 7)
+                      .map(([dezenas, valor]) => (
+                        <div key={dezenas} className="flex justify-between">
+                          <span>{dezenas} dezenas:</span>
+                          <span className="font-semibold">
+                            R$ {valor.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      ))}
+                    <div className="text-muted-foreground text-xs pt-1">
+                      ... e assim por diante até 20 dezenas
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Caso os valores tenham sido atualizados pela Caixa, entre em contato com o suporte.
+                  </p>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmAndCreate}>
+                Confirmo, criar bolão
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AuthGuard>
   );
