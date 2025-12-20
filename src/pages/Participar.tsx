@@ -123,7 +123,7 @@ export default function Participar() {
     toast.success("Logout realizado com sucesso!");
   };
 
-  if (loading || authLoading || isLoggingIn) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
