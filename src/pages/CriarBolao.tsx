@@ -162,7 +162,7 @@ export default function CriarBolao() {
                         <SelectTrigger id="tipo">
                           <SelectValue placeholder="Selecione a loteria" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent position="popper" className="z-50">
                           {Object.entries(LOTTERY_TYPES).map(([key, lottery]) => (
                             <SelectItem key={key} value={key}>
                               {lottery.name}
@@ -232,7 +232,7 @@ export default function CriarBolao() {
                               )}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
+                          <PopoverContent className="w-50 p-0" align="start" sideOffset={4}>
                             <Calendar
                               mode="single"
                               selected={selectedDate}
@@ -242,7 +242,8 @@ export default function CriarBolao() {
                               }}
                               locale={ptBR}
                               disabled={(date) => date < new Date()}
-                              className="pointer-events-auto"
+                              className="p-3 pointer-events-auto"
+                              initialFocus
                             />
                           </PopoverContent>
                         </Popover>
@@ -285,7 +286,7 @@ export default function CriarBolao() {
                             )}
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
+                        <PopoverContent className="w-auto p-0" align="start" sideOffset={4}>
                           <Calendar
                             mode="single"
                             selected={selectedDeadline}
@@ -295,7 +296,8 @@ export default function CriarBolao() {
                             }}
                             locale={ptBR}
                             disabled={(date) => date < new Date()}
-                            className="pointer-events-auto"
+                            className="p-3 pointer-events-auto"
+                            initialFocus
                           />
                         </PopoverContent>
                       </Popover>
