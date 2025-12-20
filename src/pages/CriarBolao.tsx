@@ -44,6 +44,8 @@ export default function CriarBolao() {
   const [permiteRepeticao, setPermiteRepeticao] = useState(true);
   const [showPriceConfirmation, setShowPriceConfirmation] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<CreateBolaoInput | null>(null);
+  const [datePopoverOpen, setDatePopoverOpen] = useState(false);
+  const [deadlinePopoverOpen, setDeadlinePopoverOpen] = useState(false);
 
   const form = useForm<CreateBolaoInput>({
     resolver: zodResolver(createBolaoSchema),
@@ -214,7 +216,7 @@ export default function CriarBolao() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Data do Sorteio</Label>
-                        <Popover>
+                        <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
                           <PopoverTrigger asChild>
                             <Button
                               variant="outline"
@@ -232,13 +234,14 @@ export default function CriarBolao() {
                               )}
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-50 p-0" align="start" sideOffset={4}>
+                          <PopoverContent className="w-auto p-0" align="start" sideOffset={4}>
                             <Calendar
                               mode="single"
                               selected={selectedDate}
                               onSelect={(date) => {
                                 setSelectedDate(date);
                                 form.setValue("data_sorteio", date ? format(date, "yyyy-MM-dd") : "");
+                                setDatePopoverOpen(false);
                               }}
                               locale={ptBR}
                               disabled={(date) => date < new Date()}
@@ -268,7 +271,7 @@ export default function CriarBolao() {
 
                     <div className="space-y-2">
                       <Label>Data Limite para Apostas</Label>
-                      <Popover>
+                      <Popover open={deadlinePopoverOpen} onOpenChange={setDeadlinePopoverOpen}>
                         <PopoverTrigger asChild>
                           <Button
                             variant="outline"
@@ -293,6 +296,7 @@ export default function CriarBolao() {
                             onSelect={(date) => {
                               setSelectedDeadline(date);
                               form.setValue("data_limite_apostas", date ? date.toISOString() : "");
+                              setDeadlinePopoverOpen(false);
                             }}
                             locale={ptBR}
                             disabled={(date) => date < new Date()}
