@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Trophy, Loader2, Search, Star, CheckCircle2 } from "lucide-react";
+import { Trophy, Star, CheckCircle2, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MatchResult {
@@ -17,20 +15,12 @@ interface MatchResult {
   apelido?: string;
 }
 
-interface LotteryResult {
-  success: boolean;
-  concurso: number;
-  dataApuracao: string;
-  numerosSorteados: number[];
-  acumulado: boolean;
-  valorAcumulado: number;
-  resultadosJogos: MatchResult[];
-  resultadosApostas: (MatchResult & { apelido?: string })[];
-  resumo: {
-    totalJogosVerificados: number;
-    maiorQuantidadeAcertos: number;
-    jogosComQuatroOuMaisAcertos: number;
-  };
+interface ResultSummary {
+  senas: number;
+  quinas: number;
+  quadras: number;
+  ternos: number;
+  totalVerificado: number;
 }
 
 interface LotteryResultsCheckerProps {
@@ -40,77 +30,115 @@ interface LotteryResultsCheckerProps {
   savedNumerosSorteados?: number[] | null;
   savedResultadoVerificado?: boolean;
   paidBets: Array<{ id: string; apelido: string; dezenas: number[] }>;
+  onResultsVerified?: () => void;
 }
 
 export function LotteryResultsChecker({ 
   bolaoId, 
-  lotteryType,
-  savedNumeroConcurso,
   savedNumerosSorteados,
   savedResultadoVerificado,
-  paidBets
+  paidBets,
+  onResultsVerified
 }: LotteryResultsCheckerProps) {
-  const [numeroConcurso, setNumeroConcurso] = useState(savedNumeroConcurso?.toString() || "");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<LotteryResult | null>(null);
+  const [selectedNumbers, setSelectedNumbers] = useState<number[]>(savedNumerosSorteados || []);
+  const [results, setResults] = useState<MatchResult[]>([]);
+  const [summary, setSummary] = useState<ResultSummary | null>(null);
+  const [saving, setSaving] = useState(false);
 
-  const handleCheckResults = async () => {
-    if (!numeroConcurso.trim()) {
-      toast.error("Informe o número do concurso");
+  const toggleNumber = (num: number) => {
+    if (results.length > 0) return; // Don't allow changes after verification
+    
+    setSelectedNumbers(prev => {
+      if (prev.includes(num)) {
+        return prev.filter(n => n !== num);
+      }
+      if (prev.length >= 6) {
+        toast.error("Selecione exatamente 6 números");
+        return prev;
+      }
+      return [...prev, num].sort((a, b) => a - b);
+    });
+  };
+
+  const clearSelection = () => {
+    if (results.length > 0) return;
+    setSelectedNumbers([]);
+  };
+
+  const calculateResults = () => {
+    if (selectedNumbers.length !== 6) {
+      toast.error("Selecione exatamente 6 números sorteados");
       return;
     }
 
-    const concursoNum = parseInt(numeroConcurso, 10);
-    if (isNaN(concursoNum) || concursoNum <= 0) {
-      toast.error("Número do concurso inválido");
+    if (paidBets.length === 0) {
+      toast.error("Não há apostas pagas para verificar");
       return;
     }
 
-    setLoading(true);
-    setResult(null);
+    const matchResults: MatchResult[] = paidBets.map(bet => {
+      const acertos = bet.dezenas.filter(num => selectedNumbers.includes(num));
+      return {
+        jogoId: bet.id,
+        dezenas: bet.dezenas,
+        acertos,
+        quantidadeAcertos: acertos.length,
+        apelido: bet.apelido,
+      };
+    });
+
+    // Calculate summary
+    const senas = matchResults.filter(r => r.quantidadeAcertos === 6).length;
+    const quinas = matchResults.filter(r => r.quantidadeAcertos === 5).length;
+    const quadras = matchResults.filter(r => r.quantidadeAcertos === 4).length;
+    const ternos = matchResults.filter(r => r.quantidadeAcertos === 3).length;
+
+    setResults(matchResults.sort((a, b) => b.quantidadeAcertos - a.quantidadeAcertos));
+    setSummary({
+      senas,
+      quinas,
+      quadras,
+      ternos,
+      totalVerificado: matchResults.length,
+    });
+
+    toast.success("Resultado verificado!");
+  };
+
+  const handleSaveResults = async () => {
+    if (selectedNumbers.length !== 6) {
+      toast.error("Selecione exatamente 6 números");
+      return;
+    }
+
+    setSaving(true);
 
     try {
-      // Get current user session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast.error("Sessão expirada. Por favor, faça login novamente.");
-        setLoading(false);
-        return;
+      const { error } = await supabase
+        .from("boloes")
+        .update({
+          numeros_sorteados: selectedNumbers,
+          resultado_verificado: true,
+        })
+        .eq("id", bolaoId);
+
+      if (error) {
+        throw error;
       }
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-lottery-results`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          bolaoId,
-          numeroConcurso: concursoNum,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.error(data.error || "Erro ao verificar resultado");
-        return;
-      }
-
-      // Add apelido to apostas results
-      const resultadosApostasComApelido = data.resultadosApostas.map((r: MatchResult) => {
-        const bet = paidBets.find(b => b.id === r.jogoId);
-        return { ...r, apelido: bet?.apelido || "Desconhecido" };
-      });
-
-      setResult({ ...data, resultadosApostas: resultadosApostasComApelido });
-      toast.success("Resultado verificado com sucesso!");
+      toast.success("Resultado salvo com sucesso!");
+      onResultsVerified?.();
     } catch (error) {
-      console.error("Error checking results:", error);
-      toast.error("Erro ao conectar com o servidor");
+      console.error("Error saving results:", error);
+      toast.error("Erro ao salvar resultado");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
+  };
+
+  const resetVerification = () => {
+    setResults([]);
+    setSummary(null);
   };
 
   const getMatchBadgeVariant = (count: number) => {
@@ -124,11 +152,17 @@ export function LotteryResultsChecker({
     if (count >= 6) return "bg-yellow-500 text-yellow-950";
     if (count >= 5) return "bg-success text-success-foreground";
     if (count >= 4) return "bg-primary text-primary-foreground";
+    if (count >= 3) return "bg-orange-500 text-white";
     return "";
   };
 
-  // If we have saved results, show them
-  const displayNumbers = result?.numerosSorteados || savedNumerosSorteados;
+  const getMatchLabel = (count: number) => {
+    if (count === 6) return "SENA";
+    if (count === 5) return "QUINA";
+    if (count === 4) return "QUADRA";
+    if (count === 3) return "TERNO";
+    return `${count} acertos`;
+  };
 
   return (
     <Card>
@@ -138,164 +172,174 @@ export function LotteryResultsChecker({
           Verificar Resultado
         </CardTitle>
         <CardDescription>
-          Consulte o resultado do concurso e veja quantos acertos cada jogo teve
+          Informe os 6 números sorteados e veja quantos acertos cada aposta teve
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Input Section */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1 space-y-2">
-            <Label htmlFor="concurso">Número do Concurso</Label>
-            <Input
-              id="concurso"
-              type="number"
-              placeholder="Ex: 2800"
-              value={numeroConcurso}
-              onChange={(e) => setNumeroConcurso(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          <div className="flex items-end">
-            <Button onClick={handleCheckResults} disabled={loading} className="w-full sm:w-auto">
-              {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Search className="h-4 w-4 mr-2" />
+        {/* Number Selection Grid */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Star className="h-4 w-4 text-yellow-500" />
+              Números Sorteados ({selectedNumbers.length}/6)
+              {savedResultadoVerificado && results.length === 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  Verificado anteriormente
+                </Badge>
               )}
-              Verificar
-            </Button>
+            </h4>
+            {selectedNumbers.length > 0 && results.length === 0 && (
+              <Button variant="ghost" size="sm" onClick={clearSelection}>
+                <X className="h-4 w-4 mr-1" />
+                Limpar
+              </Button>
+            )}
           </div>
-        </div>
 
-        {/* Drawn Numbers Display */}
-        {displayNumbers && displayNumbers.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium flex items-center gap-2">
-                <Star className="h-4 w-4 text-yellow-500" />
-                Números Sorteados
-                {savedResultadoVerificado && !result && (
-                  <Badge variant="secondary" className="text-xs">
-                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                    Verificado anteriormente
-                  </Badge>
-                )}
-              </h4>
-              {result && (
-                <span className="text-xs text-muted-foreground">
-                  Concurso {result.concurso} - {result.dataApuracao}
-                </span>
-              )}
-            </div>
+          {/* Selected Numbers Display */}
+          {selectedNumbers.length > 0 && (
             <div className="flex flex-wrap gap-2 justify-center p-4 rounded-lg bg-gradient-to-r from-yellow-500/10 to-amber-500/10 border border-yellow-500/30">
-              {displayNumbers.map((num) => (
+              {selectedNumbers.map((num) => (
                 <span
                   key={num}
-                  className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500 text-yellow-950 text-lg font-bold shadow-lg"
+                  className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500 text-yellow-950 text-lg font-bold shadow-lg cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => !results.length && toggleNumber(num)}
                 >
                   {num.toString().padStart(2, "0")}
                 </span>
               ))}
             </div>
-            {result?.acumulado && (
-              <p className="text-center text-sm text-muted-foreground">
-                Acumulou! Próximo prêmio: R$ {(result.valorAcumulado / 1000000).toFixed(1)} milhões
-              </p>
+          )}
+
+          {/* Number Grid for Selection */}
+          {results.length === 0 && (
+            <div className="grid grid-cols-10 gap-1 sm:gap-2">
+              {Array.from({ length: 60 }, (_, i) => i + 1).map((num) => {
+                const isSelected = selectedNumbers.includes(num);
+                return (
+                  <button
+                    key={num}
+                    onClick={() => toggleNumber(num)}
+                    className={`
+                      aspect-square flex items-center justify-center rounded-lg text-xs sm:text-sm font-medium
+                      transition-all duration-200 border
+                      ${isSelected 
+                        ? "bg-yellow-500 text-yellow-950 border-yellow-600 ring-2 ring-yellow-400 shadow-lg scale-105" 
+                        : "bg-card border-border hover:bg-accent hover:border-primary/50"
+                      }
+                    `}
+                  >
+                    {num.toString().padStart(2, "0")}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 justify-center pt-2">
+            {results.length === 0 ? (
+              <Button 
+                onClick={calculateResults} 
+                disabled={selectedNumbers.length !== 6}
+                className="min-w-[150px]"
+              >
+                Verificar Apostas
+              </Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={resetVerification}>
+                  Nova Verificação
+                </Button>
+                {!savedResultadoVerificado && (
+                  <Button onClick={handleSaveResults} disabled={saving}>
+                    {saving ? "Salvando..." : "Salvar Resultado"}
+                  </Button>
+                )}
+              </>
             )}
           </div>
-        )}
+        </div>
 
         {/* Results Summary */}
-        {result && (
+        {summary && (
           <>
             <Separator />
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-3 rounded-lg bg-muted/50 border">
-                <p className="text-xs text-muted-foreground">Jogos Verificados</p>
-                <p className="text-2xl font-bold">{result.resumo.totalJogosVerificados}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-primary/10 border border-primary/30">
-                <p className="text-xs text-muted-foreground">Maior Acerto</p>
-                <p className="text-2xl font-bold text-primary">{result.resumo.maiorQuantidadeAcertos}</p>
-              </div>
-              <div className="p-3 rounded-lg bg-success/10 border border-success/30">
-                <p className="text-xs text-muted-foreground">4+ Acertos</p>
-                <p className="text-2xl font-bold text-success">{result.resumo.jogosComQuatroOuMaisAcertos}</p>
-              </div>
-            </div>
-
-            {/* Games Results */}
-            {result.resultadosJogos.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium">Jogos Selecionados</h4>
-                <div className="space-y-2">
-                  {result.resultadosJogos
-                    .sort((a, b) => b.quantidadeAcertos - a.quantidadeAcertos)
-                    .map((jogo, index) => (
-                      <div 
-                        key={jogo.jogoId} 
-                        className={`p-3 rounded-lg border ${jogo.quantidadeAcertos >= 4 ? "bg-success/10 border-success/30" : "bg-muted/30"}`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium">Jogo {index + 1}</span>
-                          <Badge variant={getMatchBadgeVariant(jogo.quantidadeAcertos)} className={getMatchColor(jogo.quantidadeAcertos)}>
-                            {jogo.quantidadeAcertos} acertos
-                          </Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {jogo.dezenas.map((num) => (
-                            <span
-                              key={num}
-                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
-                                jogo.acertos.includes(num)
-                                  ? "bg-success text-success-foreground ring-2 ring-success"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {num.toString().padStart(2, "0")}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-center">Resumo dos Resultados</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className={`p-4 rounded-lg border text-center ${summary.senas > 0 ? "bg-yellow-500/20 border-yellow-500" : "bg-muted/50"}`}>
+                  <p className="text-xs text-muted-foreground font-medium">Senas (6)</p>
+                  <p className={`text-3xl font-bold ${summary.senas > 0 ? "text-yellow-600" : "text-muted-foreground"}`}>
+                    {summary.senas}
+                  </p>
+                </div>
+                <div className={`p-4 rounded-lg border text-center ${summary.quinas > 0 ? "bg-success/20 border-success" : "bg-muted/50"}`}>
+                  <p className="text-xs text-muted-foreground font-medium">Quinas (5)</p>
+                  <p className={`text-3xl font-bold ${summary.quinas > 0 ? "text-success" : "text-muted-foreground"}`}>
+                    {summary.quinas}
+                  </p>
+                </div>
+                <div className={`p-4 rounded-lg border text-center ${summary.quadras > 0 ? "bg-primary/20 border-primary" : "bg-muted/50"}`}>
+                  <p className="text-xs text-muted-foreground font-medium">Quadras (4)</p>
+                  <p className={`text-3xl font-bold ${summary.quadras > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                    {summary.quadras}
+                  </p>
+                </div>
+                <div className={`p-4 rounded-lg border text-center ${summary.ternos > 0 ? "bg-orange-500/20 border-orange-500" : "bg-muted/50"}`}>
+                  <p className="text-xs text-muted-foreground font-medium">Ternos (3)</p>
+                  <p className={`text-3xl font-bold ${summary.ternos > 0 ? "text-orange-600" : "text-muted-foreground"}`}>
+                    {summary.ternos}
+                  </p>
                 </div>
               </div>
-            )}
+              <p className="text-center text-sm text-muted-foreground">
+                {summary.totalVerificado} apostas verificadas
+              </p>
+            </div>
 
             {/* Individual Bets Results */}
-            {result.resultadosApostas.length > 0 && (
+            {results.length > 0 && (
               <div className="space-y-3">
-                <h4 className="text-sm font-medium">Apostas Individuais</h4>
+                <h4 className="text-sm font-medium">Detalhamento por Aposta</h4>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {result.resultadosApostas
-                    .sort((a, b) => b.quantidadeAcertos - a.quantidadeAcertos)
-                    .map((aposta) => (
-                      <div 
-                        key={aposta.jogoId} 
-                        className={`p-3 rounded-lg border ${aposta.quantidadeAcertos >= 4 ? "bg-success/10 border-success/30" : "bg-muted/30"}`}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium">{aposta.apelido}</span>
-                          <Badge variant={getMatchBadgeVariant(aposta.quantidadeAcertos)} className={getMatchColor(aposta.quantidadeAcertos)}>
-                            {aposta.quantidadeAcertos} acertos
-                          </Badge>
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {aposta.dezenas.sort((a, b) => a - b).map((num) => (
-                            <span
-                              key={num}
-                              className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
-                                aposta.acertos.includes(num)
-                                  ? "bg-success text-success-foreground ring-2 ring-success"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              {num.toString().padStart(2, "0")}
-                            </span>
-                          ))}
-                        </div>
+                  {results.map((aposta) => (
+                    <div 
+                      key={aposta.jogoId} 
+                      className={`p-3 rounded-lg border ${
+                        aposta.quantidadeAcertos >= 4 
+                          ? "bg-success/10 border-success/30" 
+                          : aposta.quantidadeAcertos >= 3 
+                            ? "bg-orange-500/10 border-orange-500/30"
+                            : "bg-muted/30"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium">{aposta.apelido}</span>
+                        <Badge 
+                          variant={getMatchBadgeVariant(aposta.quantidadeAcertos)} 
+                          className={getMatchColor(aposta.quantidadeAcertos)}
+                        >
+                          {getMatchLabel(aposta.quantidadeAcertos)}
+                        </Badge>
                       </div>
-                    ))}
+                      <div className="flex flex-wrap gap-1">
+                        {aposta.dezenas.sort((a, b) => a - b).map((num) => (
+                          <span
+                            key={num}
+                            className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                              aposta.acertos.includes(num)
+                                ? "bg-success text-success-foreground ring-2 ring-success"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {num.toString().padStart(2, "0")}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
