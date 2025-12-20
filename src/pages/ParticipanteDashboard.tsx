@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, LogOut, Users, Calendar, TrendingUp, TrendingDown, ChevronRight, Eye } from "lucide-react";
+import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
+import { cn } from "@/lib/utils";
 
 interface ParticipantSession {
   token: string;
@@ -21,6 +23,9 @@ interface BolaoParticipacao {
   created_at: string;
   total_apostas: number;
   encerrado: boolean;
+  data_sorteio?: string | null;
+  numeros_sorteados?: number[] | null;
+  resultado_verificado?: boolean;
   minhasApostas: Array<{
     id: string;
     dezenas: number[];
@@ -112,6 +117,9 @@ export default function ParticipanteDashboard() {
           created_at: bolaoInfo.created_at,
           total_apostas: bolaoInfo.total_apostas,
           encerrado: bolaoInfo.encerrado,
+          data_sorteio: null, // Not returned by get_bolao_for_participation currently
+          numeros_sorteados: bolaoInfo.numeros_sorteados,
+          resultado_verificado: bolaoInfo.resultado_verificado,
           minhasApostas,
         });
       }
@@ -421,11 +429,25 @@ export default function ParticipanteDashboard() {
                 <CardContent className="py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold truncate">{bolao.nome_do_bolao}</h3>
-                        {bolao.encerrado && (
-                          <Badge variant="secondary" className="text-xs">Encerrado</Badge>
-                        )}
+                        {(() => {
+                          const statusInfo = getBolaoStatus({
+                            encerrado: bolao.encerrado,
+                            data_sorteio: bolao.data_sorteio,
+                            numeros_sorteados: bolao.numeros_sorteados,
+                            resultado_verificado: bolao.resultado_verificado,
+                          });
+                          return (
+                            <Badge 
+                              variant="outline" 
+                              className={cn("text-xs", getStatusBadgeClasses(statusInfo.variant))}
+                            >
+                              <span className="mr-1">{statusInfo.icon}</span>
+                              {statusInfo.label}
+                            </Badge>
+                          );
+                        })()}
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">

@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Users, ExternalLink, Copy } from "lucide-react";
 import { toast } from "sonner";
+import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
+import { cn } from "@/lib/utils";
 
 interface BolaoCardProps {
   id: string;
@@ -11,9 +13,23 @@ interface BolaoCardProps {
   totalApostas: number;
   createdAt: string;
   index: number;
+  encerrado?: boolean;
+  dataSorteio?: string | null;
+  numerosSorteados?: number[] | null;
+  resultadoVerificado?: boolean;
 }
 
-export function BolaoCard({ id, nome, totalApostas, createdAt, index }: BolaoCardProps) {
+export function BolaoCard({ 
+  id, 
+  nome, 
+  totalApostas, 
+  createdAt, 
+  index,
+  encerrado = false,
+  dataSorteio,
+  numerosSorteados,
+  resultadoVerificado = false
+}: BolaoCardProps) {
   const formattedDate = new Date(createdAt).toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "short",
@@ -30,6 +46,13 @@ export function BolaoCard({ id, nome, totalApostas, createdAt, index }: BolaoCar
       toast.error("Erro ao copiar link");
     }
   };
+
+  const statusInfo = getBolaoStatus({
+    encerrado,
+    data_sorteio: dataSorteio,
+    numeros_sorteados: numerosSorteados,
+    resultado_verificado: resultadoVerificado,
+  });
 
   return (
     <Card 
@@ -53,6 +76,14 @@ export function BolaoCard({ id, nome, totalApostas, createdAt, index }: BolaoCar
             <span className="font-semibold animate-count">{totalApostas}</span>
           </Badge>
         </div>
+        {/* Status Badge */}
+        <Badge 
+          variant="outline"
+          className={cn("mt-2 text-xs font-medium", getStatusBadgeClasses(statusInfo.variant))}
+        >
+          <span className="mr-1">{statusInfo.icon}</span>
+          {statusInfo.label}
+        </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex gap-2">
