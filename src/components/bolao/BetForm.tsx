@@ -15,10 +15,11 @@ import { cn } from "@/lib/utils";
 interface BetFormProps {
   bolaoId: string;
   bolaoNome: string;
-  chavePix: string;
+  chavePix: string | null; // null if not authenticated
   observacoes?: string;
   valorCota: number;
   onSuccess: (apelido: string, celular: string) => void;
+  isAuthenticated?: boolean;
 }
 
 interface SessionBet {
@@ -27,7 +28,7 @@ interface SessionBet {
   receiptUploaded: boolean;
 }
 
-export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess }: BetFormProps) {
+export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess, isAuthenticated }: BetFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [shakeForm, setShakeForm] = useState(false);
@@ -301,7 +302,13 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
       <CardHeader className="text-center">
         <CardTitle className="text-2xl text-primary">{bolaoNome}</CardTitle>
         <CardDescription className="space-y-2">
-          <p className="font-medium">Chave PIX: {chavePix}</p>
+          {chavePix ? (
+            <p className="font-medium">Chave PIX: {chavePix}</p>
+          ) : (
+            <p className="text-sm text-muted-foreground italic">
+              🔒 Registre sua aposta para ver as informações de pagamento
+            </p>
+          )}
           {observacoes && <p className="text-sm">{observacoes}</p>}
         </CardDescription>
       </CardHeader>
@@ -319,6 +326,22 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                 Sua aposta foi confirmada.
               </p>
             </div>
+
+            {/* Payment Info - only shown after authentication */}
+            {chavePix && (
+              <div className="p-4 rounded-lg bg-success/10 border border-success/20">
+                <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+                  💳 Informações de Pagamento
+                </h4>
+                <p className="text-sm text-foreground">
+                  <span className="text-muted-foreground">Chave PIX:</span>{" "}
+                  <span className="font-mono font-medium">{chavePix}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Faça o pagamento e envie o comprovante para cada aposta.
+                </p>
+              </div>
+            )}
 
             {/* Session Bets Summary */}
             <div className="space-y-3">

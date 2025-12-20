@@ -13,7 +13,7 @@ import { toast } from "sonner";
 interface Bolao {
   id: string;
   nome_do_bolao: string;
-  chave_pix: string;
+  chave_pix: string | null; // Now null until participant is authenticated
   observacoes: string | null;
   total_apostas: number;
   gestor_name: string | null;
@@ -28,6 +28,7 @@ export default function Participar() {
   const navigate = useNavigate();
   const { session, isLoading: authLoading, logout, login } = useParticipantAuth(id);
   const [bolao, setBolao] = useState<Bolao | null>(null);
+  const [paymentInfo, setPaymentInfo] = useState<{ chave_pix: string; valor_cota: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [counter, setCounter] = useState(0);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -57,6 +58,34 @@ export default function Participar() {
     fetchBolao();
   }, [fetchBolao]);
 
+  // Fetch payment info when participant is authenticated
+  const fetchPaymentInfo = useCallback(async () => {
+    if (!id || !session?.token) return;
+
+    const { data, error } = await supabase.rpc("get_bolao_payment_info", {
+      p_bolao_id: id,
+      p_token: session.token,
+    });
+
+    if (!error && data) {
+      const result = data as { success: boolean; chave_pix?: string; valor_cota?: number };
+      if (result.success && result.chave_pix) {
+        setPaymentInfo({
+          chave_pix: result.chave_pix,
+          valor_cota: Number(result.valor_cota) || 10,
+        });
+      }
+    }
+  }, [id, session?.token]);
+
+  useEffect(() => {
+    if (session?.token) {
+      fetchPaymentInfo();
+    } else {
+      setPaymentInfo(null);
+    }
+  }, [session?.token, fetchPaymentInfo]);
+
   const handleSuccess = async (apelido: string, celular: string) => {
     setCounter((prev) => prev + 1);
     
@@ -72,8 +101,9 @@ export default function Participar() {
       setIsLoggingIn(false);
       
       if (result.success) {
+        // Payment info will be fetched automatically via useEffect
         toast.success("Aposta registrada e login realizado!", {
-          description: `Para acessar novamente, use seu apelido e os 4 últimos dígitos do celular (${last4}) como senha.`,
+          description: `Agora você pode ver as informações de pagamento. Use seu apelido e os 4 últimos dígitos do celular (${last4}) para acessar novamente.`,
           duration: 8000,
         });
       } else {
@@ -235,14 +265,15 @@ export default function Participar() {
             </p>
           )}
 
-          {/* Bet Form */}
+          {/* Bet Form - pass payment info only if authenticated */}
           <BetForm
             bolaoId={bolao.id}
             bolaoNome={bolao.nome_do_bolao}
-            chavePix={bolao.chave_pix}
+            chavePix={paymentInfo?.chave_pix || null}
             observacoes={bolao.observacoes || undefined}
-            valorCota={bolao.valor_cota}
+            valorCota={paymentInfo?.valor_cota || bolao.valor_cota}
             onSuccess={handleSuccess}
+            isAuthenticated={!!session}
           />
 
           {/* Messages Panel */}
