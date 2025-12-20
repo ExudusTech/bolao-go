@@ -109,23 +109,44 @@ export function MessagesPanel({
   }, [messages]);
 
   async function fetchMessages() {
-    // Only select non-sensitive fields - exclude autor_celular to protect PII
-    const { data, error } = await supabase
-      .from('mensagens')
-      .select('id, bolao_id, autor_nome, autor_gestor_id, conteudo, created_at')
-      .eq('bolao_id', bolaoId)
-      .order('created_at', { ascending: true });
+    let newMessages: Message[] = [];
 
-    if (error) {
-      console.error('Error fetching messages:', error);
-      return;
+    if (isGestor) {
+      // Gestor uses direct query (RLS allows access)
+      const { data, error } = await supabase
+        .from('mensagens')
+        .select('id, bolao_id, autor_nome, autor_gestor_id, conteudo, created_at')
+        .eq('bolao_id', bolaoId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching messages:', error);
+        return;
+      }
+
+      newMessages = (data || []).map(msg => ({
+        ...msg,
+        autor_celular: null
+      }));
+    } else if (participantToken) {
+      // Participant uses RPC function (validates token)
+      const { data, error } = await supabase.rpc('get_bolao_messages', {
+        p_bolao_id: bolaoId,
+        p_token: participantToken
+      });
+
+      if (error) {
+        console.error('Error fetching messages via RPC:', error);
+        return;
+      }
+
+      const result = data as unknown as { success: boolean; messages?: Message[]; error?: string };
+      if (result?.success && result.messages) {
+        newMessages = result.messages;
+      }
     }
+    // If not gestor and no token, no messages are fetched (user needs to login)
 
-    // Map to Message type, setting autor_celular to null since we don't fetch it
-    const newMessages: Message[] = (data || []).map(msg => ({
-      ...msg,
-      autor_celular: null
-    }));
     handleNewMessages(newMessages);
     setMessages(newMessages);
   }
