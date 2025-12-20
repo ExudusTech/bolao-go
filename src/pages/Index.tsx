@@ -15,11 +15,6 @@ export default function Index() {
       description: "Gere um link exclusivo para cada bolão e compartilhe facilmente",
     },
     {
-      icon: Users,
-      title: "Sem Cadastro para Participantes",
-      description: "Participantes enviam apostas sem precisar criar conta",
-    },
-    {
       icon: BarChart3,
       title: "Contador em Tempo Real",
       description: "Acompanhe o número de apostas conforme são registradas",
