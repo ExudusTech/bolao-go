@@ -7,13 +7,15 @@ interface ClosedBolaoMessageProps {
   resultadoVerificado: boolean;
   numerosSorteados: number[] | null;
   isPrized?: boolean;
+  deadlineMessage?: string;
 }
 
 export function ClosedBolaoMessage({ 
   bolaoNome, 
   resultadoVerificado, 
   numerosSorteados,
-  isPrized = false
+  isPrized = false,
+  deadlineMessage
 }: ClosedBolaoMessageProps) {
   const hasDrawn = resultadoVerificado && numerosSorteados && numerosSorteados.length > 0;
 
@@ -40,7 +42,7 @@ export function ClosedBolaoMessage({
         <CardTitle className="text-xl">{bolaoNome}</CardTitle>
         <CardDescription className="flex items-center justify-center gap-2 mt-2">
           <Lock className="h-4 w-4" />
-          Bolão encerrado para novas apostas
+          {deadlineMessage || "Bolão encerrado para novas apostas"}
         </CardDescription>
       </CardHeader>
       <CardContent className="text-center space-y-4">

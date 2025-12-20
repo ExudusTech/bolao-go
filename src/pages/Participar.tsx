@@ -7,13 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useParticipantAuth } from "@/hooks/useParticipantAuth";
-import { Loader2, Users, ArrowLeft, LogIn, LogOut, User } from "lucide-react";
+import { Loader2, Users, ArrowLeft, LogIn, LogOut, User, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { format, isPast, formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Bolao {
   id: string;
   nome_do_bolao: string;
-  chave_pix: string | null; // Now null until participant is authenticated
+  chave_pix: string | null;
   observacoes: string | null;
   total_apostas: number;
   gestor_name: string | null;
@@ -21,6 +23,7 @@ interface Bolao {
   numeros_sorteados: number[] | null;
   resultado_verificado: boolean;
   valor_cota: number;
+  data_limite_apostas: string | null;
 }
 
 export default function Participar() {
@@ -48,6 +51,7 @@ export default function Participar() {
         numeros_sorteados: bolaoData.numeros_sorteados ?? null,
         resultado_verificado: bolaoData.resultado_verificado ?? false,
         valor_cota: Number(bolaoData.valor_cota) || 10,
+        data_limite_apostas: bolaoData.data_limite_apostas ?? null,
       });
       setCounter(bolaoData.total_apostas);
     }
@@ -149,8 +153,12 @@ export default function Participar() {
     );
   }
 
-  // Show closed message if bolão is encerrado
-  if (bolao.encerrado) {
+  // Check if deadline has passed
+  const deadlinePassed = bolao.data_limite_apostas && isPast(new Date(bolao.data_limite_apostas));
+  const isClosed = bolao.encerrado || deadlinePassed;
+
+  // Show closed message if bolão is encerrado or deadline passed
+  if (isClosed) {
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
@@ -183,6 +191,7 @@ export default function Participar() {
             resultadoVerificado={bolao.resultado_verificado}
             numerosSorteados={bolao.numeros_sorteados}
             isPrized={false}
+            deadlineMessage={deadlinePassed && !bolao.encerrado ? "O prazo para apostas encerrou" : undefined}
           />
 
           {/* Messages Panel */}
@@ -248,6 +257,20 @@ export default function Participar() {
       {/* Main Content */}
       <main className="container py-6 px-4">
         <div className="flex flex-col items-center gap-6">
+          {/* Deadline Warning */}
+          {bolao.data_limite_apostas && !isPast(new Date(bolao.data_limite_apostas)) && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-4 py-2 rounded-lg animate-fade-in">
+              <Clock className="h-4 w-4" />
+              <span>
+                Apostas até{" "}
+                <span className="font-medium text-foreground">
+                  {format(new Date(bolao.data_limite_apostas), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                </span>
+                {" "}({formatDistanceToNow(new Date(bolao.data_limite_apostas), { locale: ptBR, addSuffix: true })})
+              </span>
+            </div>
+          )}
+
           {/* Counter Badge */}
           <Badge 
             variant="secondary" 
