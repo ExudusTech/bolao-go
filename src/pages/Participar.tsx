@@ -25,10 +25,11 @@ interface Bolao {
 export default function Participar() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { session, isLoading: authLoading, logout } = useParticipantAuth(id);
+  const { session, isLoading: authLoading, logout, login } = useParticipantAuth(id);
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [loading, setLoading] = useState(true);
   const [counter, setCounter] = useState(0);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const fetchBolao = useCallback(async () => {
     if (!id) return;
@@ -54,10 +55,24 @@ export default function Participar() {
     fetchBolao();
   }, [fetchBolao]);
 
-  const handleSuccess = () => {
+  const handleSuccess = async (apelido: string, celular: string) => {
     setCounter((prev) => prev + 1);
-    // Redirect to login after successful bet
-    toast.success("Aposta registrada! Faça login para acessar todas as funcionalidades.");
+    
+    // If not logged in, auto-login after first bet
+    if (!session && id && apelido && celular) {
+      setIsLoggingIn(true);
+      const senha = celular.slice(-4); // Last 4 digits
+      const result = await login(id, apelido, senha);
+      setIsLoggingIn(false);
+      
+      if (result.success) {
+        toast.success("Aposta registrada e login realizado com sucesso!");
+      } else {
+        toast.success("Aposta registrada com sucesso!");
+      }
+    } else {
+      toast.success("Aposta registrada com sucesso!");
+    }
   };
 
   const handleLogout = async () => {
@@ -65,7 +80,7 @@ export default function Participar() {
     toast.success("Logout realizado com sucesso!");
   };
 
-  if (loading || authLoading) {
+  if (loading || authLoading || isLoggingIn) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -177,7 +192,7 @@ export default function Participar() {
             </div>
             <span className="font-bold text-foreground">Robolão</span>
           </Link>
-          {session ? (
+          {session && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
                 Olá, <span className="font-medium text-foreground">{session.apelido}</span>
@@ -187,13 +202,6 @@ export default function Participar() {
                 Sair
               </Button>
             </div>
-          ) : (
-            <Button asChild variant="outline" size="sm">
-              <Link to={`/participar/${id}/login`}>
-                <LogIn className="h-4 w-4 mr-2" />
-                Entrar
-              </Link>
-            </Button>
           )}
         </div>
       </header>

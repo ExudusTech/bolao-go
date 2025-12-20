@@ -16,7 +16,7 @@ interface BetFormProps {
   bolaoNome: string;
   chavePix: string;
   observacoes?: string;
-  onSuccess: (apelido?: string, celular?: string) => void;
+  onSuccess: (apelido: string, celular: string) => void;
 }
 
 interface SessionBet {
