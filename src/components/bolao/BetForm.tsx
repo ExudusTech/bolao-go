@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { apostasSchema, ApostaInput } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
@@ -322,11 +323,18 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="celular">Celular *</Label>
-                  <Input
-                    id="celular"
-                    placeholder="(00) 00000-0000"
-                    {...form.register("celular")}
-                    disabled={isLoading}
+                  <Controller
+                    name="celular"
+                    control={form.control}
+                    render={({ field }) => (
+                      <PhoneInput
+                        id="celular"
+                        placeholder="(00) 00000-0000"
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={isLoading}
+                      />
+                    )}
                   />
                   {form.formState.errors.celular && (
                     <p className="text-sm text-destructive animate-fade-in">
