@@ -3,7 +3,7 @@ import { Header } from "@/components/layout/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowRight, Link2, Users, Download, Shield, Zap, BarChart3 } from "lucide-react";
+import { ArrowRight, Link2, Users, Download, Shield, Zap, BarChart3, User } from "lucide-react";
 
 export default function Index() {
   const { user } = useAuth();
@@ -110,6 +110,33 @@ export default function Index() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* Participant Area Section */}
+      <section className="border-t bg-card">
+        <div className="container py-10 px-4 sm:py-12">
+          <div className="mx-auto max-w-2xl text-center">
+            <div className="flex justify-center mb-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <User className="h-6 w-6" />
+              </div>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+              Já é participante de um bolão?
+            </h2>
+            <p className="mt-2 text-sm sm:text-base text-muted-foreground">
+              Acesse sua área para ver todos os bolões que você participa e acompanhar suas apostas.
+            </p>
+            <div className="mt-4">
+              <Button variant="outline" size="lg" asChild className="hover-scale">
+                <Link to="/participante">
+                  <User className="h-4 w-4 mr-2" />
+                  Área do Participante
+                </Link>
+              </Button>
+            </div>
+          </div>
         </div>
       </section>
 

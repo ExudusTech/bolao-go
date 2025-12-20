@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useParticipantAuth } from "@/hooks/useParticipantAuth";
-import { Loader2, Users, ArrowLeft, LogIn, LogOut } from "lucide-react";
+import { Loader2, Users, ArrowLeft, LogIn, LogOut, User } from "lucide-react";
 import { toast } from "sonner";
 
 interface Bolao {
@@ -259,11 +259,17 @@ export default function Participar() {
 
       {/* Footer */}
       <footer className="border-t py-6 mt-8">
-        <div className="container text-center text-sm text-muted-foreground">
-          Powered by{" "}
-          <Link to="/" className="font-medium text-primary hover:underline">
-            Robolão
+        <div className="container flex flex-col items-center gap-3 text-sm text-muted-foreground">
+          <Link to="/participante" className="flex items-center gap-1 text-primary hover:underline">
+            <User className="h-4 w-4" />
+            Ver todos os meus bolões
           </Link>
+          <p>
+            Powered by{" "}
+            <Link to="/" className="font-medium text-primary hover:underline">
+              Robolão
+            </Link>
+          </p>
         </div>
       </footer>
     </div>
