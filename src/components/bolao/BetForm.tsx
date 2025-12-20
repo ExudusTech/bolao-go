@@ -4,12 +4,12 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PhoneInput } from "@/components/ui/phone-input";
+import { InternationalPhoneInput } from "@/components/ui/international-phone-input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { apostasSchema, ApostaInput } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Check, Share2, Upload, FileImage } from "lucide-react";
+import { Loader2, Check, Share2, Upload, FileImage, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BetFormProps {
@@ -207,6 +207,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
     event.target.value = '';
   };
 
+  const totalValue = sessionBets.length * valorCota;
   const numbers = Array.from({ length: 60 }, (_, i) => i + 1);
 
   return (
@@ -243,14 +244,22 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
 
             {/* Session Bets Summary */}
             <div className="space-y-3">
-              <h4 className="text-sm font-medium text-foreground">
-                Suas apostas nesta sessão ({sessionBets.length} {sessionBets.length === 1 ? 'aposta' : 'apostas'}):
-              </h4>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-medium text-foreground">
+                  Suas apostas ({sessionBets.length} {sessionBets.length === 1 ? 'cota' : 'cotas'}):
+                </h4>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Valor a pagar:</p>
+                  <p className="text-lg font-bold text-primary">
+                    R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-60 overflow-y-auto">
                 {sessionBets.map((bet, index) => (
                   <div
                     key={bet.id}
-                    className="flex items-center justify-between p-2 rounded-md bg-muted/50 border"
+                    className="flex items-center justify-between p-3 rounded-md bg-muted/50 border"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground w-6">#{index + 1}</span>
@@ -258,7 +267,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                         {bet.numbers.map((num) => (
                           <span
                             key={num}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-success text-success-foreground font-medium text-xs"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-success text-success-foreground font-medium text-xs"
                           >
                             {num.toString().padStart(2, "0")}
                           </span>
@@ -304,7 +313,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                 onClick={handleNewBet}
                 className="w-full h-12 text-base font-semibold hover-scale bg-accent text-accent-foreground hover:bg-accent/90"
               >
-                Registrar nova aposta
+                <Plus className="h-5 w-5 mr-2" />
+                +1 Cota
               </Button>
               
               <Button
@@ -313,7 +323,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                   const betsText = sessionBets
                     .map((bet, i) => `#${i + 1}: ${bet.numbers.map(n => n.toString().padStart(2, "0")).join(", ")}`)
                     .join("\n");
-                  const message = `🍀 *Minhas apostas no bolão "${bolaoNome}"*\n\nParticipante: ${participantInfo?.apelido}\nTotal de apostas: ${sessionBets.length}\n\n${betsText}\n\nBoa sorte! 🎯`;
+                  const message = `🍀 *Minhas apostas no bolão "${bolaoNome}"*\n\nParticipante: ${participantInfo?.apelido}\nTotal de cotas: ${sessionBets.length}\nValor total: R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n${betsText}\n\nBoa sorte! 🎯`;
                   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
                   window.open(whatsappUrl, "_blank");
                 }}
@@ -349,9 +359,8 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                     name="celular"
                     control={form.control}
                     render={({ field }) => (
-                      <PhoneInput
+                      <InternationalPhoneInput
                         id="celular"
-                        placeholder="(00) 00000-0000"
                         value={field.value}
                         onChange={field.onChange}
                         disabled={isLoading}

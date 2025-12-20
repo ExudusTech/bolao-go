@@ -46,6 +46,7 @@ export default function Participar() {
         encerrado: bolaoData.encerrado ?? false,
         numeros_sorteados: bolaoData.numeros_sorteados ?? null,
         resultado_verificado: bolaoData.resultado_verificado ?? false,
+        valor_cota: Number(bolaoData.valor_cota) || 10,
       });
       setCounter(bolaoData.total_apostas);
     }
@@ -236,6 +237,7 @@ export default function Participar() {
             bolaoNome={bolao.nome_do_bolao}
             chavePix={bolao.chave_pix}
             observacoes={bolao.observacoes || undefined}
+            valorCota={bolao.valor_cota}
             onSuccess={handleSuccess}
           />
 

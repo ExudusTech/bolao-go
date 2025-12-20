@@ -314,6 +314,7 @@ export type Database = {
           observacoes: string
           resultado_verificado: boolean
           total_apostas: number
+          valor_cota: number
         }[]
       }
       get_bolao_messages: {
