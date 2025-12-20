@@ -45,6 +45,7 @@ export const createBolaoSchema = z.object({
   tipo_loteria: z.enum(["megasena"]).default("megasena"),
   valor_cota: z.number().min(1, "Valor mínimo é R$ 1,00").max(1000, "Valor máximo é R$ 1.000,00"),
   data_sorteio: z.string().optional(),
+  data_limite_apostas: z.string().optional(),
   numero_concurso: z.number().int().positive("Número do concurso inválido").optional(),
   observacoes: z.string().max(500, "Observações muito longas").optional(),
 });
