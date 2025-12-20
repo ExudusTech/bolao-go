@@ -317,6 +317,10 @@ export type Database = {
         Args: { p_bolao_id: string; p_celular: string }
         Returns: boolean
       }
+      is_valid_participant_for_bolao: {
+        Args: { p_bolao_id: string }
+        Returns: boolean
+      }
       participant_login: {
         Args: { p_apelido: string; p_bolao_id: string; p_senha: string }
         Returns: Json
