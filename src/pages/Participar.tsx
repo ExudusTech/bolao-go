@@ -20,6 +20,7 @@ interface Bolao {
   encerrado: boolean;
   numeros_sorteados: number[] | null;
   resultado_verificado: boolean;
+  valor_cota: number;
 }
 
 export default function Participar() {
