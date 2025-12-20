@@ -52,9 +52,34 @@ export const createBolaoSchema = z.object({
 export const apostasSchema = z.object({
   apelido: z.string().min(2, "Apelido deve ter no mínimo 2 caracteres").max(50, "Apelido muito longo"),
   celular: z.string()
-    .transform((val) => val.replace(/\D/g, '')) // Strip all non-digits
-    .refine((val) => val.length >= 10 && val.length <= 11, "Celular deve ter 10 ou 11 dígitos")
-    .refine((val) => /^[1-9]{2}9?\d{8}$/.test(val), "Formato de celular brasileiro inválido"),
+    .transform((val) => {
+      // Format is "CC:digits" (e.g., "BR:11999999999")
+      const parts = val.split(':');
+      if (parts.length === 2) {
+        return `${parts[0]}:${parts[1].replace(/\D/g, '')}`;
+      }
+      // Fallback: assume Brazil
+      return `BR:${val.replace(/\D/g, '')}`;
+    })
+    .refine((val) => {
+      const parts = val.split(':');
+      if (parts.length !== 2) return false;
+      const [countryCode, digits] = parts;
+      
+      // Validate based on country
+      switch (countryCode) {
+        case 'BR':
+          return digits.length >= 10 && digits.length <= 11 && /^[1-9]{2}9?\d{8}$/.test(digits);
+        case 'US':
+          return digits.length === 10 && /^[2-9]\d{9}$/.test(digits);
+        case 'PT':
+          return digits.length === 9 && /^9\d{8}$/.test(digits);
+        case 'ES':
+          return digits.length === 9 && /^[6-7]\d{8}$/.test(digits);
+        default:
+          return digits.length >= 7 && digits.length <= 15;
+      }
+    }, "Número de celular inválido para o país selecionado"),
   dezenas: z.array(z.number().min(1, "Número inválido").max(60, "Número deve ser entre 1 e 60"))
     .length(6, "Selecione exatamente 6 números")
     .refine((arr) => new Set(arr).size === 6, "Os números devem ser diferentes"),
