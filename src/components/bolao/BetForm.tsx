@@ -30,24 +30,58 @@ interface SessionBet {
 }
 
 export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess, isAuthenticated, isLoggingIn }: BetFormProps) {
+  const STORAGE_KEY = `bolao_bets_${bolaoId}`;
+  
+  // Load persisted state from localStorage
+  const loadPersistedState = () => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return JSON.parse(stored) as {
+          participantInfo: { apelido: string; celular: string } | null;
+          sessionBets: SessionBet[];
+          hasSubmittedBet: boolean;
+        };
+      }
+    } catch (e) {
+      console.error("[BetForm] Error loading persisted state:", e);
+    }
+    return null;
+  };
+
+  const persistedState = loadPersistedState();
+
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [shakeForm, setShakeForm] = useState(false);
   const [honeypot, setHoneypot] = useState("");
-  const [hasSubmittedBet, setHasSubmittedBet] = useState(false);
-  const [participantInfo, setParticipantInfo] = useState<{ apelido: string; celular: string } | null>(null);
-  const [sessionBets, setSessionBets] = useState<SessionBet[]>([]);
+  const [hasSubmittedBet, setHasSubmittedBet] = useState(persistedState?.hasSubmittedBet ?? false);
+  const [participantInfo, setParticipantInfo] = useState<{ apelido: string; celular: string } | null>(
+    persistedState?.participantInfo ?? null
+  );
+  const [sessionBets, setSessionBets] = useState<SessionBet[]>(persistedState?.sessionBets ?? []);
   const [uploadingBetId, setUploadingBetId] = useState<string | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const [showOthersNumbers, setShowOthersNumbers] = useState(false);
   const [loadingOthers, setLoadingOthers] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Persist state to localStorage whenever it changes
+  useEffect(() => {
+    if (participantInfo || sessionBets.length > 0 || hasSubmittedBet) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        participantInfo,
+        sessionBets,
+        hasSubmittedBet,
+      }));
+    }
+  }, [participantInfo, sessionBets, hasSubmittedBet, STORAGE_KEY]);
+
   const form = useForm<ApostaInput>({
     resolver: zodResolver(apostasSchema),
     defaultValues: {
-      apelido: "",
-      celular: "",
+      apelido: persistedState?.participantInfo?.apelido ?? "",
+      celular: persistedState?.participantInfo?.celular ?? "",
       dezenas: [],
     },
   });
