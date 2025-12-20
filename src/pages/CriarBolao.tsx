@@ -40,6 +40,7 @@ export default function CriarBolao() {
   const [createdBolao, setCreatedBolao] = useState<{ id: string; link: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [selectedDeadline, setSelectedDeadline] = useState<Date | undefined>();
   const [permiteRepeticao, setPermiteRepeticao] = useState(true);
   const [showPriceConfirmation, setShowPriceConfirmation] = useState(false);
   const [pendingFormData, setPendingFormData] = useState<CreateBolaoInput | null>(null);
@@ -52,6 +53,7 @@ export default function CriarBolao() {
       tipo_loteria: "megasena",
       valor_cota: 10,
       data_sorteio: "",
+      data_limite_apostas: "",
       numero_concurso: undefined,
       observacoes: "",
     },
@@ -79,6 +81,7 @@ export default function CriarBolao() {
         tipo_loteria: data.tipo_loteria,
         valor_cota: data.valor_cota,
         data_sorteio: data.data_sorteio || null,
+        data_limite_apostas: data.data_limite_apostas || null,
         numero_concurso: data.numero_concurso || null,
         observacoes: data.observacoes?.trim() || null,
         permite_apostas_repetidas: permiteRepeticao,
@@ -239,6 +242,7 @@ export default function CriarBolao() {
                               }}
                               locale={ptBR}
                               disabled={(date) => date < new Date()}
+                              className="pointer-events-auto"
                             />
                           </PopoverContent>
                         </Popover>
@@ -259,6 +263,45 @@ export default function CriarBolao() {
                           </p>
                         )}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Data Limite para Apostas</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !selectedDeadline && "text-muted-foreground"
+                            )}
+                            disabled={isLoading}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {selectedDeadline ? (
+                              format(selectedDeadline, "dd/MM/yyyy", { locale: ptBR })
+                            ) : (
+                              "Selecione (opcional)"
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={selectedDeadline}
+                            onSelect={(date) => {
+                              setSelectedDeadline(date);
+                              form.setValue("data_limite_apostas", date ? date.toISOString() : "");
+                            }}
+                            locale={ptBR}
+                            disabled={(date) => date < new Date()}
+                            className="pointer-events-auto"
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <p className="text-xs text-muted-foreground">
+                        Após esta data, novas apostas não serão aceitas
+                      </p>
                     </div>
 
                     <div className="space-y-2">

@@ -77,6 +77,7 @@ export type Database = {
         Row: {
           chave_pix: string
           created_at: string
+          data_limite_apostas: string | null
           data_sorteio: string | null
           encerrado: boolean
           gestor_id: string
@@ -96,6 +97,7 @@ export type Database = {
         Insert: {
           chave_pix: string
           created_at?: string
+          data_limite_apostas?: string | null
           data_sorteio?: string | null
           encerrado?: boolean
           gestor_id: string
@@ -115,6 +117,7 @@ export type Database = {
         Update: {
           chave_pix?: string
           created_at?: string
+          data_limite_apostas?: string | null
           data_sorteio?: string | null
           encerrado?: boolean
           gestor_id?: string
