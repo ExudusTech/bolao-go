@@ -66,7 +66,10 @@ export default function Participar() {
       setIsLoggingIn(false);
       
       if (result.success) {
-        toast.success("Aposta registrada e login realizado com sucesso!");
+        toast.success("Aposta registrada e login realizado!", {
+          description: `Para acessar novamente, use seu apelido e os 4 últimos dígitos do celular (${celular.slice(-4)}) como senha.`,
+          duration: 8000,
+        });
       } else {
         toast.success("Aposta registrada com sucesso!");
       }
