@@ -322,6 +322,10 @@ export type Database = {
         Returns: Json
       }
       get_bolao_number_counts: { Args: { p_bolao_id: string }; Returns: Json }
+      get_bolao_payment_info: {
+        Args: { p_bolao_id: string; p_token: string }
+        Returns: Json
+      }
       is_bolao_participant: {
         Args: { p_bolao_id: string; p_celular: string }
         Returns: boolean
