@@ -9,11 +9,20 @@ export type BolaoStatus =
   | "sem_premio"
   | "encerrado";
 
+// Define the stages in order
+export const BOLAO_STAGES = [
+  { key: "em_aberto", label: "Aberto", shortLabel: "1" },
+  { key: "apostas_encerradas", label: "Fechado", shortLabel: "2" },
+  { key: "aguardando_sorteio", label: "Sorteio", shortLabel: "3" },
+  { key: "concurso_realizado", label: "Resultado", shortLabel: "4" },
+] as const;
+
 export interface BolaoStatusInfo {
   status: BolaoStatus;
   label: string;
   variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning";
   icon: string;
+  step: number; // 1-4 representing the current stage
 }
 
 interface BolaoData {
@@ -21,7 +30,6 @@ interface BolaoData {
   data_sorteio?: string | null;
   numeros_sorteados?: number[] | null;
   resultado_verificado?: boolean;
-  // Future: has_winners could be added to determine "premiado" vs "sem_premio"
 }
 
 export function getBolaoStatus(bolao: BolaoData): BolaoStatusInfo {
@@ -33,66 +41,71 @@ export function getBolaoStatus(bolao: BolaoData): BolaoStatusInfo {
     dataSorteio.setHours(0, 0, 0, 0);
   }
 
-  // Check if result is verified and numbers are drawn
+  // Check if result is verified and numbers are drawn - Stage 4 complete
   if (bolao.numeros_sorteados && bolao.numeros_sorteados.length > 0 && bolao.resultado_verificado) {
-    // For now, we show "concurso_realizado" - in the future, could check for winners
     return {
       status: "concurso_realizado",
       label: "Sorteado",
       variant: "success",
-      icon: "🎯"
+      icon: "🎯",
+      step: 4
     };
   }
 
-  // Numbers are drawn but not yet verified
+  // Numbers are drawn but not yet verified - Stage 4 in progress
   if (bolao.numeros_sorteados && bolao.numeros_sorteados.length > 0) {
     return {
       status: "concurso_realizado",
-      label: "Concurso Realizado",
+      label: "Resultado Verificado",
       variant: "success",
-      icon: "🎲"
+      icon: "🎲",
+      step: 4
     };
   }
 
-  // Bolão is closed (bets no longer accepted)
+  // Bolão is closed (bets no longer accepted) - At least Stage 2
   if (bolao.encerrado) {
-    // If has draw date in the future, waiting for draw
+    // If has draw date in the future or today, waiting for draw - Stage 3
     if (dataSorteio && dataSorteio >= today) {
       return {
         status: "aguardando_sorteio",
         label: "Aguardando Sorteio",
         variant: "warning",
-        icon: "⏳"
+        icon: "⏳",
+        step: 3
       };
     }
     
-    // If draw date passed but no results yet
+    // If draw date passed but no results yet - Stage 3 (waiting for result)
     if (dataSorteio && dataSorteio < today) {
       return {
         status: "aguardando_sorteio",
         label: "Aguardando Resultado",
         variant: "warning",
-        icon: "📋"
+        icon: "📋",
+        step: 3
       };
     }
 
-    // Closed without draw date
+    // Closed without draw date - Stage 2
     return {
       status: "apostas_encerradas",
       label: "Apostas Encerradas",
       variant: "secondary",
-      icon: "🔒"
+      icon: "🔒",
+      step: 2
     };
   }
 
-  // Bolão is open for bets
-  // If draw date is set and today is that date or passed, should consider closing
-  if (dataSorteio && dataSorteio <= today) {
+  // Bolão is open for bets - Stage 1
+  // If draw date is set and today is that date, highlight it
+  if (dataSorteio && dataSorteio.getTime() === today.getTime()) {
     return {
-      status: "aguardando_sorteio",
-      label: "Dia do Sorteio",
+      status: "em_aberto",
+      label: "Dia do Sorteio!",
       variant: "warning",
-      icon: "📅"
+      icon: "📅",
+      step: 1
     };
   }
 
@@ -100,7 +113,8 @@ export function getBolaoStatus(bolao: BolaoData): BolaoStatusInfo {
     status: "em_aberto",
     label: "Em Aberto",
     variant: "default",
-    icon: "🟢"
+    icon: "🟢",
+    step: 1
   };
 }
 
