@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Switch } from "@/components/ui/switch";
 import { createBolaoSchema, CreateBolaoInput, LOTTERY_TYPES } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -29,6 +30,7 @@ export default function CriarBolao() {
   const [createdBolao, setCreatedBolao] = useState<{ id: string; link: string } | null>(null);
   const [copied, setCopied] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
+  const [permiteRepeticao, setPermiteRepeticao] = useState(true);
 
   const form = useForm<CreateBolaoInput>({
     resolver: zodResolver(createBolaoSchema),
@@ -59,6 +61,7 @@ export default function CriarBolao() {
         data_sorteio: data.data_sorteio || null,
         numero_concurso: data.numero_concurso || null,
         observacoes: data.observacoes?.trim() || null,
+        permite_apostas_repetidas: permiteRepeticao,
       })
       .select("id")
       .single();
@@ -252,6 +255,21 @@ export default function CriarBolao() {
                           {form.formState.errors.observacoes.message}
                         </p>
                       )}
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="permite-repeticao" className="text-base">Permitir apostas repetidas</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Se desativado, participantes não poderão registrar as mesmas dezenas de outro participante
+                        </p>
+                      </div>
+                      <Switch
+                        id="permite-repeticao"
+                        checked={permiteRepeticao}
+                        onCheckedChange={setPermiteRepeticao}
+                        disabled={isLoading}
+                      />
                     </div>
 
                     <Button type="submit" className="w-full hover-scale" disabled={isLoading}>

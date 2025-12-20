@@ -17,6 +17,7 @@ interface BetFormProps {
   bolaoNome: string;
   chavePix: string;
   observacoes?: string;
+  valorCota: number;
   onSuccess: (apelido: string, celular: string) => void;
 }
 
@@ -26,7 +27,7 @@ interface SessionBet {
   receiptUploaded: boolean;
 }
 
-export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }: BetFormProps) {
+export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, onSuccess }: BetFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>([]);
   const [shakeForm, setShakeForm] = useState(false);
@@ -35,6 +36,7 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
   const [participantInfo, setParticipantInfo] = useState<{ apelido: string; celular: string } | null>(null);
   const [sessionBets, setSessionBets] = useState<SessionBet[]>([]);
   const [uploadingBetId, setUploadingBetId] = useState<string | null>(null);
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<ApostaInput>({
@@ -80,6 +82,26 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, onSuccess }
     }
 
     setIsLoading(true);
+
+    // Check for duplicate bets
+    setCheckingDuplicate(true);
+    const { data: duplicateCheck, error: duplicateError } = await supabase.rpc('check_duplicate_bet', {
+      p_bolao_id: bolaoId,
+      p_dezenas: selectedNumbers,
+    }) as { data: { allowed: boolean; message?: string; duplicate_of?: string } | null; error: unknown };
+    setCheckingDuplicate(false);
+
+    if (duplicateError) {
+      console.error("[BetForm] Erro ao verificar duplicatas:", duplicateError);
+    } else if (duplicateCheck && !duplicateCheck.allowed) {
+      setIsLoading(false);
+      setShakeForm(true);
+      setTimeout(() => setShakeForm(false), 320);
+      toast.error(`Estas dezenas já foram registradas por "${duplicateCheck.duplicate_of}". Por favor, escolha outros números.`, {
+        duration: 6000,
+      });
+      return;
+    }
 
     const apelido = participantInfo?.apelido || data.apelido.trim();
     // `data.celular` já chega normalizado (somente dígitos) via zod transform

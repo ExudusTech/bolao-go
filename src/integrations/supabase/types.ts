@@ -86,6 +86,7 @@ export type Database = {
           numero_concurso: number | null
           numeros_sorteados: number[] | null
           observacoes: string | null
+          permite_apostas_repetidas: boolean
           resultado_verificado: boolean | null
           tipo_loteria: string
           total_apostas: number
@@ -104,6 +105,7 @@ export type Database = {
           numero_concurso?: number | null
           numeros_sorteados?: number[] | null
           observacoes?: string | null
+          permite_apostas_repetidas?: boolean
           resultado_verificado?: boolean | null
           tipo_loteria?: string
           total_apostas?: number
@@ -122,6 +124,7 @@ export type Database = {
           numero_concurso?: number | null
           numeros_sorteados?: number[] | null
           observacoes?: string | null
+          permite_apostas_repetidas?: boolean
           resultado_verificado?: boolean | null
           tipo_loteria?: string
           total_apostas?: number
@@ -294,6 +297,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_duplicate_bet: {
+        Args: { p_bolao_id: string; p_dezenas: number[] }
+        Returns: Json
+      }
       get_bolao_for_participation: {
         Args: { bolao_id: string }
         Returns: {
