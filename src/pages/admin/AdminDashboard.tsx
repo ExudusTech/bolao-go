@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2, KeyRound } from "lucide-react";
+import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2, KeyRound, ChevronDown, ChevronUp } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -36,18 +36,32 @@ interface Profile {
   id: string;
   name: string;
   email: string;
+  created_at: string;
 }
 
-interface Participant {
+interface GestorBolao {
+  id: string;
+  nome: string;
+  encerrado: boolean;
+}
+
+interface ParticipantData {
   apelido: string;
   celular_ultimos4: string | null;
-  bolao_nome: string;
+  created_at: string;
+  boloes: {
+    bolao_id: string;
+    bolao_nome: string;
+    valor_pendente: number;
+    valor_pago: number;
+  }[];
 }
 
 export default function AdminDashboard() {
   const [boloes, setBoloes] = useState<Bolao[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participants, setParticipants] = useState<ParticipantData[]>([]);
+  const [gestorBoloes, setGestorBoloes] = useState<Record<string, GestorBolao[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"boloes" | "users">("boloes");
@@ -67,18 +81,18 @@ export default function AdminDashboard() {
 
       if (boloesError) throw boloesError;
 
-      // Fetch all profiles
+      // Fetch all profiles with created_at
       const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, name, email, created_at")
         .order("created_at", { ascending: false });
 
       if (profilesError) throw profilesError;
 
-      // Fetch all participants (apostas)
+      // Fetch all participants (apostas) with payment info
       const { data: apostasData, error: apostasError } = await supabase
         .from("apostas")
-        .select("apelido, celular_ultimos4, bolao_id")
+        .select("apelido, celular_ultimos4, bolao_id, created_at, payment_status")
         .order("created_at", { ascending: false });
 
       if (apostasError) throw apostasError;
@@ -93,23 +107,65 @@ export default function AdminDashboard() {
         };
       });
 
-      // Map participants with bolão name (using unique apelido per bolão)
-      const uniqueParticipants = new Map<string, Participant>();
+      // Group bolões by gestor
+      const gestorBoloesMap: Record<string, GestorBolao[]> = {};
+      boloesData?.forEach((bolao) => {
+        if (!gestorBoloesMap[bolao.gestor_id]) {
+          gestorBoloesMap[bolao.gestor_id] = [];
+        }
+        gestorBoloesMap[bolao.gestor_id].push({
+          id: bolao.id,
+          nome: bolao.nome_do_bolao,
+          encerrado: bolao.encerrado,
+        });
+      });
+
+      // Map participants with all bolões they participated in (grouped by unique apelido + celular)
+      const participantsMap = new Map<string, ParticipantData>();
       apostasData?.forEach((aposta) => {
         const bolao = boloesData?.find((b) => b.id === aposta.bolao_id);
-        const key = `${aposta.apelido}-${aposta.bolao_id}`;
-        if (!uniqueParticipants.has(key)) {
-          uniqueParticipants.set(key, {
+        const key = `${aposta.apelido}-${aposta.celular_ultimos4}`;
+        
+        if (!participantsMap.has(key)) {
+          participantsMap.set(key, {
             apelido: aposta.apelido,
             celular_ultimos4: aposta.celular_ultimos4,
-            bolao_nome: bolao?.nome_do_bolao || "Desconhecido",
+            created_at: aposta.created_at,
+            boloes: [],
           });
+        }
+        
+        const participant = participantsMap.get(key)!;
+        const valorCota = bolao?.valor_cota || 0;
+        const isPaid = aposta.payment_status === 'paid';
+        
+        // Check if bolao already added
+        const existingBolao = participant.boloes.find(b => b.bolao_id === aposta.bolao_id);
+        if (!existingBolao) {
+          participant.boloes.push({
+            bolao_id: aposta.bolao_id,
+            bolao_nome: bolao?.nome_do_bolao || "Desconhecido",
+            valor_pendente: isPaid ? 0 : valorCota,
+            valor_pago: isPaid ? valorCota : 0,
+          });
+        } else {
+          if (isPaid) {
+            existingBolao.valor_pago += valorCota;
+          } else {
+            existingBolao.valor_pendente += valorCota;
+          }
+        }
+        
+        // Keep earliest created_at
+        if (new Date(aposta.created_at) < new Date(participant.created_at)) {
+          participant.created_at = aposta.created_at;
         }
       });
 
       setBoloes(boloesWithGestor);
       setProfiles(profilesData || []);
-      setParticipants(Array.from(uniqueParticipants.values()));
+      setGestorBoloes(gestorBoloesMap);
+      setParticipants(Array.from(participantsMap.values()));
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erro ao carregar dados");
@@ -342,10 +398,11 @@ export default function AdminDashboard() {
               ) : (
                 <AdminUsersTab
                   profiles={filteredProfiles}
+                  gestorBoloes={gestorBoloes}
                   participants={participants.filter(
                     (p) =>
                       p.apelido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      p.bolao_nome.toLowerCase().includes(searchTerm.toLowerCase())
+                      p.boloes.some(b => b.bolao_nome.toLowerCase().includes(searchTerm.toLowerCase()))
                   )}
                   onRefresh={fetchData}
                 />
@@ -361,15 +418,42 @@ export default function AdminDashboard() {
 
 interface AdminUsersTabProps {
   profiles: Profile[];
-  participants: Participant[];
+  gestorBoloes: Record<string, GestorBolao[]>;
+  participants: ParticipantData[];
   onRefresh: () => void;
 }
 
-function AdminUsersTab({ profiles, participants, onRefresh }: AdminUsersTabProps) {
+function AdminUsersTab({ profiles, gestorBoloes, participants, onRefresh }: AdminUsersTabProps) {
   const [userRoles, setUserRoles] = useState<Record<string, boolean>>({});
   const [loadingRoles, setLoadingRoles] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
   const [resettingPassword, setResettingPassword] = useState<string | null>(null);
+  const [expandedGestors, setExpandedGestors] = useState<Set<string>>(new Set());
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+
+  const toggleGestorExpand = (id: string) => {
+    setExpandedGestors(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleParticipantExpand = (key: string) => {
+    setExpandedParticipants(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetchRoles();
@@ -473,8 +557,10 @@ function AdminUsersTab({ profiles, participants, onRefresh }: AdminUsersTabProps
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10"></TableHead>
                 <TableHead>Nome</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Criado em</TableHead>
                 <TableHead>Função</TableHead>
                 <TableHead>Ações</TableHead>
               </TableRow>
@@ -482,53 +568,92 @@ function AdminUsersTab({ profiles, participants, onRefresh }: AdminUsersTabProps
             <TableBody>
               {profiles.map((profile) => {
                 const isAdmin = userRoles[profile.id] || false;
+                const isExpanded = expandedGestors.has(profile.id);
+                const userBoloes = gestorBoloes[profile.id] || [];
                 return (
-                  <TableRow key={profile.id}>
-                    <TableCell className="font-medium">{profile.name}</TableCell>
-                    <TableCell>{profile.email}</TableCell>
-                    <TableCell>
-                      {loadingRoles ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Badge variant={isAdmin ? "default" : "secondary"}>
-                          {isAdmin ? "Admin" : "Gestor"}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <Button
-                          variant={isAdmin ? "destructive" : "outline"}
-                          size="sm"
-                          disabled={updating === profile.id}
-                          onClick={() => toggleAdmin(profile.id, isAdmin)}
-                        >
-                          {updating === profile.id && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          )}
-                          {isAdmin ? "Remover Admin" : "Promover a Admin"}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={resettingPassword === profile.id}
-                          onClick={() => handleResetPassword(profile.email, profile.id)}
-                        >
-                          {resettingPassword === profile.id ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <KeyRound className="mr-2 h-4 w-4" />
-                          )}
-                          Resetar Senha
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                  <>
+                    <TableRow key={profile.id}>
+                      <TableCell>
+                        {userBoloes.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleGestorExpand(profile.id)}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{profile.name}</TableCell>
+                      <TableCell>{profile.email}</TableCell>
+                      <TableCell>
+                        {format(new Date(profile.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        {loadingRoles ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Badge variant={isAdmin ? "default" : "secondary"}>
+                            {isAdmin ? "Admin" : "Gestor"}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            variant={isAdmin ? "destructive" : "outline"}
+                            size="sm"
+                            disabled={updating === profile.id}
+                            onClick={() => toggleAdmin(profile.id, isAdmin)}
+                          >
+                            {updating === profile.id && (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            {isAdmin ? "Remover Admin" : "Promover a Admin"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={resettingPassword === profile.id}
+                            onClick={() => handleResetPassword(profile.email, profile.id)}
+                          >
+                            {resettingPassword === profile.id ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                              <KeyRound className="mr-2 h-4 w-4" />
+                            )}
+                            Resetar Senha
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && userBoloes.length > 0 && (
+                      <TableRow key={`${profile.id}-boloes`}>
+                        <TableCell colSpan={6} className="bg-muted/50 p-4">
+                          <div className="text-sm font-medium mb-2">Bolões criados ({userBoloes.length})</div>
+                          <div className="flex flex-wrap gap-2">
+                            {userBoloes.map((bolao) => (
+                              <Badge
+                                key={bolao.id}
+                                variant={bolao.encerrado ? "secondary" : "default"}
+                              >
+                                {bolao.nome} {bolao.encerrado ? "(Encerrado)" : "(Ativo)"}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
                 );
               })}
               {profiles.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8">
+                  <TableCell colSpan={6} className="text-center py-8">
                     Nenhum gestor encontrado
                   </TableCell>
                 </TableRow>
@@ -547,26 +672,73 @@ function AdminUsersTab({ profiles, participants, onRefresh }: AdminUsersTabProps
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10"></TableHead>
                 <TableHead>Apelido</TableHead>
                 <TableHead>Celular (últimos 4)</TableHead>
-                <TableHead>Bolão</TableHead>
+                <TableHead>Criado em</TableHead>
                 <TableHead>Função</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {participants.map((participant, index) => (
-                <TableRow key={`${participant.apelido}-${index}`}>
-                  <TableCell className="font-medium">{participant.apelido}</TableCell>
-                  <TableCell>****-****-{participant.celular_ultimos4 || "????"}</TableCell>
-                  <TableCell>{participant.bolao_nome}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">Participante</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {participants.map((participant, index) => {
+                const key = `${participant.apelido}-${participant.celular_ultimos4}-${index}`;
+                const isExpanded = expandedParticipants.has(key);
+                const totalPendente = participant.boloes.reduce((sum, b) => sum + b.valor_pendente, 0);
+                const totalPago = participant.boloes.reduce((sum, b) => sum + b.valor_pago, 0);
+                return (
+                  <>
+                    <TableRow key={key}>
+                      <TableCell>
+                        {participant.boloes.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleParticipantExpand(key)}
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{participant.apelido}</TableCell>
+                      <TableCell>****-****-{participant.celular_ultimos4 || "????"}</TableCell>
+                      <TableCell>
+                        {format(new Date(participant.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">Participante</Badge>
+                      </TableCell>
+                    </TableRow>
+                    {isExpanded && participant.boloes.length > 0 && (
+                      <TableRow key={`${key}-boloes`}>
+                        <TableCell colSpan={5} className="bg-muted/50 p-4">
+                          <div className="text-sm font-medium mb-2">
+                            Bolões participados ({participant.boloes.length}) - 
+                            <span className="text-green-600 ml-2">Pago: R$ {totalPago.toFixed(2)}</span>
+                            <span className="text-amber-600 ml-2">Pendente: R$ {totalPendente.toFixed(2)}</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {participant.boloes.map((bolao) => (
+                              <Badge
+                                key={bolao.bolao_id}
+                                variant="outline"
+                              >
+                                {bolao.bolao_nome}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </>
+                );
+              })}
               {participants.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8">
+                  <TableCell colSpan={5} className="text-center py-8">
                     Nenhum participante encontrado
                   </TableCell>
                 </TableRow>
