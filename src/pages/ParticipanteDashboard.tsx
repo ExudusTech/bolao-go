@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 interface ParticipantSession {
   token: string;
   apelido: string;
-  celular: string;
 }
 
 interface BolaoParticipacao {
@@ -54,7 +53,6 @@ export default function ParticipanteDashboard() {
 
   // Login form state
   const [apelido, setApelido] = useState("");
-  const [celular, setCelular] = useState("");
   const [senha, setSenha] = useState("");
 
   // Load session on mount
@@ -83,11 +81,11 @@ export default function ParticipanteDashboard() {
     
     setLoadingBoloes(true);
     
-    // First, get all apostas for this celular
+    // Get all apostas for this apelido (case insensitive)
     const { data: apostasData, error: apostasError } = await supabase
       .from("apostas")
-      .select("id, bolao_id, dezenas, created_at, celular")
-      .or(`celular.eq.${session.celular},celular.ilike.%:${session.celular.replace(/\D/g, '').slice(-11)}`);
+      .select("id, bolao_id, dezenas, created_at, apelido")
+      .ilike("apelido", session.apelido);
     
     if (apostasError || !apostasData || apostasData.length === 0) {
       setLoadingBoloes(false);
@@ -134,22 +132,31 @@ export default function ParticipanteDashboard() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!apelido.trim() || !celular.trim() || senha.length !== 4) {
+    if (!apelido.trim() || senha.length !== 4) {
       toast.error("Preencha todos os campos corretamente");
       return;
     }
     
     setIsLoggingIn(true);
     
-    // Format phone for storage
-    const celularDigits = celular.replace(/\D/g, '');
-    const formattedCelular = `BR:${celularDigits}`;
+    // Verify credentials by checking if there's an aposta with this apelido and last 4 digits
+    const { data: apostasCheck, error: checkError } = await supabase
+      .from("apostas")
+      .select("id, celular_ultimos4")
+      .ilike("apelido", apelido.trim())
+      .eq("celular_ultimos4", senha)
+      .limit(1);
+    
+    if (checkError || !apostasCheck || apostasCheck.length === 0) {
+      toast.error("Credenciais inválidas. Verifique seu apelido e senha.");
+      setIsLoggingIn(false);
+      return;
+    }
     
     // Store session
     const newSession: ParticipantSession = {
       token: crypto.randomUUID(),
       apelido: apelido.trim(),
-      celular: formattedCelular,
     };
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newSession));
@@ -164,7 +171,6 @@ export default function ParticipanteDashboard() {
     setBoloes([]);
     setSelectedBolao(null);
     setApelido("");
-    setCelular("");
     setSenha("");
   };
 
@@ -222,7 +228,7 @@ export default function ParticipanteDashboard() {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl text-primary">Área do Participante</CardTitle>
             <CardDescription>
-              Entre com seu apelido e celular para ver seus bolões
+              Entre com seu apelido e senha para ver seus bolões
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -235,18 +241,6 @@ export default function ParticipanteDashboard() {
                   value={apelido}
                   onChange={(e) => setApelido(e.target.value)}
                   disabled={isLoggingIn}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="celular">Celular (apenas números)</Label>
-                <Input
-                  id="celular"
-                  placeholder="Ex: 11999998888"
-                  value={celular}
-                  onChange={(e) => setCelular(e.target.value.replace(/\D/g, ''))}
-                  disabled={isLoggingIn}
-                  maxLength={11}
                 />
               </div>
               
