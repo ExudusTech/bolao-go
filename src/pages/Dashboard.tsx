@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BolaoCard } from "@/components/bolao/BolaoCard";
 import { Button } from "@/components/ui/button";
@@ -45,9 +46,9 @@ export default function Dashboard() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container py-8 px-4">
+        <main className="container py-8 px-4 flex-1">
           <div className="flex flex-col gap-6">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -106,6 +107,7 @@ export default function Dashboard() {
             )}
           </div>
         </main>
+        <Footer />
       </div>
     </AuthGuard>
   );

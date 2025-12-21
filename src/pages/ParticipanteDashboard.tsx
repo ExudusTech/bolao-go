@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -223,8 +224,8 @@ export default function ParticipanteDashboard() {
   // Login screen
   if (!session) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md animate-fade-in">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md animate-fade-in mb-6">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl text-primary">Área do Participante</CardTitle>
             <CardDescription>
@@ -284,6 +285,7 @@ export default function ParticipanteDashboard() {
             </div>
           </CardContent>
         </Card>
+        <Footer />
       </div>
     );
   }
@@ -291,7 +293,7 @@ export default function ParticipanteDashboard() {
   // Bolão details view
   if (selectedBolao) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <header className="border-b bg-card">
           <div className="container py-4 px-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -312,7 +314,7 @@ export default function ParticipanteDashboard() {
           </div>
         </header>
         
-        <main className="container py-6 px-4">
+        <main className="container py-6 px-4 flex-1">
           <div className="space-y-4">
             <Card>
               <CardHeader>
@@ -384,13 +386,14 @@ export default function ParticipanteDashboard() {
             </Card>
           </div>
         </main>
+        <Footer />
       </div>
     );
   }
 
   // Bolões list
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b bg-card">
         <div className="container py-4 px-4 flex items-center justify-between">
           <div>
@@ -404,7 +407,7 @@ export default function ParticipanteDashboard() {
         </div>
       </header>
       
-      <main className="container py-6 px-4">
+      <main className="container py-6 px-4 flex-1">
         {loadingBoloes ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -475,6 +478,7 @@ export default function ParticipanteDashboard() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }
