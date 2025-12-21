@@ -267,6 +267,14 @@ export default function ParticipanteDashboard() {
                   "Entrar"
                 )}
               </Button>
+              
+              <div className="p-3 rounded-lg bg-muted/50 border border-muted">
+                <p className="text-sm text-muted-foreground text-center">
+                  <span className="font-medium">Esqueceu sua senha?</span>
+                  <br />
+                  A senha são os <span className="font-medium text-foreground">4 últimos dígitos do celular</span> que você informou ao fazer sua aposta.
+                </p>
+              </div>
             </form>
             
             <div className="mt-6 text-center">
