@@ -8,7 +8,7 @@ import { GameSuggestions, SuggestedGame, GameCriteria, SkippedGame } from "@/com
 import { GameSelectionDialog } from "@/components/bolao/GameSelectionDialog";
 import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis";
 import { NumbersGrid } from "@/components/bolao/NumbersGrid";
-import { MessagesPanel } from "@/components/bolao/MessagesPanel";
+import { FloatingMessagesPanel } from "@/components/bolao/FloatingMessagesPanel";
 import { RegistrationSummary } from "@/components/bolao/RegistrationSummary";
 import { LotteryResultsChecker } from "@/components/bolao/LotteryResultsChecker";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, MessageSquare, Table, Grid3X3, CalendarIcon, Clock, X } from "lucide-react";
+import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, Table, Grid3X3, CalendarIcon, Clock, X } from "lucide-react";
 import { LOTTERY_TYPES } from "@/lib/validations";
 import { format, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -804,15 +804,6 @@ export default function BolaoDetalhes() {
               />
             </CollapsibleSection>
 
-            {/* Messages Panel - Collapsible */}
-            <CollapsibleSection
-              title="Mensagens"
-              description="Comunicação com os participantes"
-              icon={<MessageSquare className="h-5 w-5" />}
-              defaultOpen={false}
-            >
-              <MessagesPanel bolaoId={bolao.id} isGestor={true} />
-            </CollapsibleSection>
 
             {/* Bets Table - Collapsible */}
             <CollapsibleSection
@@ -832,6 +823,9 @@ export default function BolaoDetalhes() {
         </main>
         <Footer />
       </div>
+
+      {/* Floating Messages Panel */}
+      <FloatingMessagesPanel bolaoId={bolao.id} isGestor={true} />
 
       {/* Game Selection Dialog */}
       {bolao && (
