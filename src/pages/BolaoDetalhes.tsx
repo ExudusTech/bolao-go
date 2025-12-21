@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria, SkippedGame } from "@/components/bolao/GameSuggestions";
@@ -489,9 +490,9 @@ export default function BolaoDetalhes() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container py-6 px-4 sm:py-8">
+        <main className="container py-6 px-4 sm:py-8 flex-1">
           <div className="space-y-4 sm:space-y-6">
             {/* Back Button */}
             <Button variant="ghost" size="sm" asChild>
@@ -829,6 +830,7 @@ export default function BolaoDetalhes() {
             </CollapsibleSection>
           </div>
         </main>
+        <Footer />
       </div>
 
       {/* Game Selection Dialog */}

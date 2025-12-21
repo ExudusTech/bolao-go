@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { ClosedBolaoMessage } from "@/components/bolao/ClosedBolaoMessage";
 import { BetForm } from "@/components/bolao/BetForm";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
+import { Footer } from "@/components/layout/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -216,15 +217,7 @@ export default function Participar() {
           )}
         </main>
 
-        {/* Footer */}
-        <footer className="border-t py-6 mt-8">
-          <div className="container text-center text-sm text-muted-foreground">
-            Powered by{" "}
-            <Link to="/" className="font-medium text-primary hover:underline">
-              Robolão
-            </Link>
-          </div>
-        </footer>
+        <Footer />
       </div>
     );
   }
@@ -320,10 +313,7 @@ export default function Participar() {
             Ver todos os meus bolões
           </Link>
           <p>
-            Powered by{" "}
-            <Link to="/" className="font-medium text-primary hover:underline">
-              Robolão
-            </Link>
+            Desenvolvido por ExudusTech - Seu hub de caminhos! - Todos os direitos reservados
           </p>
         </div>
       </footer>

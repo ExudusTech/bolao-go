@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useParticipantAuth } from "@/hooks/useParticipantAuth";
+import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -213,15 +214,7 @@ export default function ParticipantLogin() {
         </Card>
       </main>
 
-      {/* Footer */}
-      <footer className="border-t py-6 mt-8">
-        <div className="container text-center text-sm text-muted-foreground">
-          Powered by{" "}
-          <Link to="/" className="font-medium text-primary hover:underline">
-            Robolão
-          </Link>
-        </div>
-      </footer>
+      <Footer />
     </div>
   );
 }

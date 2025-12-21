@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Header } from "@/components/layout/Header";
+import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -118,9 +119,9 @@ export default function CriarBolao() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background flex flex-col">
         <Header />
-        <main className="container py-8 px-4">
+        <main className="container py-8 px-4 flex-1">
           <div className="max-w-lg mx-auto">
             <Button variant="ghost" size="sm" className="mb-4" asChild>
               <Link to="/gestor/dashboard">
@@ -445,6 +446,7 @@ export default function CriarBolao() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <Footer />
       </div>
     </AuthGuard>
   );
