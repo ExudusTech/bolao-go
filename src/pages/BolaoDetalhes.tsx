@@ -793,11 +793,13 @@ export default function BolaoDetalhes() {
             >
               <LotteryResultsChecker
                 bolaoId={bolao.id}
+                bolaoNome={bolao.nome_do_bolao}
                 lotteryType={bolao.tipo_loteria}
                 savedNumeroConcurso={bolao.numero_concurso}
                 savedNumerosSorteados={bolao.numeros_sorteados}
                 savedResultadoVerificado={bolao.resultado_verificado || false}
                 paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
+                onResultsVerified={fetchData}
               />
             </CollapsibleSection>
 

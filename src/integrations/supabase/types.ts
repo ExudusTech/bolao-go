@@ -328,6 +328,10 @@ export type Database = {
         Args: { p_bolao_id: string; p_dezenas: number[] }
         Returns: Json
       }
+      delete_participant_message: {
+        Args: { p_bolao_id: string; p_message_id: string; p_token: string }
+        Returns: Json
+      }
       get_bolao_for_participation: {
         Args: { bolao_id: string }
         Returns: {
@@ -377,6 +381,15 @@ export type Database = {
       participant_logout: { Args: { p_token: string }; Returns: Json }
       send_participant_message: {
         Args: { p_bolao_id: string; p_content: string; p_token: string }
+        Returns: Json
+      }
+      update_participant_message: {
+        Args: {
+          p_bolao_id: string
+          p_content: string
+          p_message_id: string
+          p_token: string
+        }
         Returns: Json
       }
       upload_receipt: {
