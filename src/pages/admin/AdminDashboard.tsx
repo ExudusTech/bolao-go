@@ -15,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2 } from "lucide-react";
+import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2, KeyRound } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -331,6 +331,7 @@ function AdminUsersTab({ profiles, onRefresh }: AdminUsersTabProps) {
   const [userRoles, setUserRoles] = useState<Record<string, boolean>>({});
   const [loadingRoles, setLoadingRoles] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [resettingPassword, setResettingPassword] = useState<string | null>(null);
 
   useEffect(() => {
     fetchRoles();
@@ -390,6 +391,39 @@ function AdminUsersTab({ profiles, onRefresh }: AdminUsersTabProps) {
     }
   }
 
+  async function handleResetPassword(email: string, userId: string) {
+    setResettingPassword(userId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error("Sessão expirada. Faça login novamente.");
+        return;
+      }
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao resetar senha");
+      }
+
+      toast.success(`Email de reset enviado para ${email}`);
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      toast.error(error instanceof Error ? error.message : "Erro ao resetar senha");
+    } finally {
+      setResettingPassword(null);
+    }
+  }
+
   return (
     <Card>
       <CardContent className="p-0">
@@ -419,17 +453,32 @@ function AdminUsersTab({ profiles, onRefresh }: AdminUsersTabProps) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant={isAdmin ? "destructive" : "outline"}
-                      size="sm"
-                      disabled={updating === profile.id}
-                      onClick={() => toggleAdmin(profile.id, isAdmin)}
-                    >
-                      {updating === profile.id && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      )}
-                      {isAdmin ? "Remover Admin" : "Promover a Admin"}
-                    </Button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant={isAdmin ? "destructive" : "outline"}
+                        size="sm"
+                        disabled={updating === profile.id}
+                        onClick={() => toggleAdmin(profile.id, isAdmin)}
+                      >
+                        {updating === profile.id && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {isAdmin ? "Remover Admin" : "Promover a Admin"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={resettingPassword === profile.id}
+                        onClick={() => handleResetPassword(profile.email, profile.id)}
+                      >
+                        {resettingPassword === profile.id ? (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                          <KeyRound className="mr-2 h-4 w-4" />
+                        )}
+                        Resetar Senha
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
