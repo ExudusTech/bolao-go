@@ -38,9 +38,16 @@ interface Profile {
   email: string;
 }
 
+interface Participant {
+  apelido: string;
+  celular_ultimos4: string | null;
+  bolao_nome: string;
+}
+
 export default function AdminDashboard() {
   const [boloes, setBoloes] = useState<Bolao[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"boloes" | "users">("boloes");
@@ -68,6 +75,14 @@ export default function AdminDashboard() {
 
       if (profilesError) throw profilesError;
 
+      // Fetch all participants (apostas)
+      const { data: apostasData, error: apostasError } = await supabase
+        .from("apostas")
+        .select("apelido, celular_ultimos4, bolao_id")
+        .order("created_at", { ascending: false });
+
+      if (apostasError) throw apostasError;
+
       // Map gestor info to bolões
       const boloesWithGestor = (boloesData || []).map((bolao) => {
         const gestor = profilesData?.find((p) => p.id === bolao.gestor_id);
@@ -78,8 +93,23 @@ export default function AdminDashboard() {
         };
       });
 
+      // Map participants with bolão name (using unique apelido per bolão)
+      const uniqueParticipants = new Map<string, Participant>();
+      apostasData?.forEach((aposta) => {
+        const bolao = boloesData?.find((b) => b.id === aposta.bolao_id);
+        const key = `${aposta.apelido}-${aposta.bolao_id}`;
+        if (!uniqueParticipants.has(key)) {
+          uniqueParticipants.set(key, {
+            apelido: aposta.apelido,
+            celular_ultimos4: aposta.celular_ultimos4,
+            bolao_nome: bolao?.nome_do_bolao || "Desconhecido",
+          });
+        }
+      });
+
       setBoloes(boloesWithGestor);
       setProfiles(profilesData || []);
+      setParticipants(Array.from(uniqueParticipants.values()));
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Erro ao carregar dados");
@@ -166,11 +196,11 @@ export default function AdminDashboard() {
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total de Gestores</CardTitle>
+                    <CardTitle className="text-sm font-medium">Gestores / Participantes</CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">{profiles.length}</div>
+                    <div className="text-2xl font-bold">{profiles.length} / {participants.length}</div>
                   </CardContent>
                 </Card>
                 <Card>
@@ -312,6 +342,11 @@ export default function AdminDashboard() {
               ) : (
                 <AdminUsersTab
                   profiles={filteredProfiles}
+                  participants={participants.filter(
+                    (p) =>
+                      p.apelido.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                      p.bolao_nome.toLowerCase().includes(searchTerm.toLowerCase())
+                  )}
                   onRefresh={fetchData}
                 />
               )}
@@ -326,10 +361,11 @@ export default function AdminDashboard() {
 
 interface AdminUsersTabProps {
   profiles: Profile[];
+  participants: Participant[];
   onRefresh: () => void;
 }
 
-function AdminUsersTab({ profiles, onRefresh }: AdminUsersTabProps) {
+function AdminUsersTab({ profiles, participants, onRefresh }: AdminUsersTabProps) {
   const [userRoles, setUserRoles] = useState<Record<string, boolean>>({});
   const [loadingRoles, setLoadingRoles] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -427,74 +463,118 @@ function AdminUsersTab({ profiles, onRefresh }: AdminUsersTabProps) {
   }
 
   return (
-    <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Função</TableHead>
-              <TableHead>Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {profiles.map((profile) => {
-              const isAdmin = userRoles[profile.id] || false;
-              return (
-                <TableRow key={profile.id}>
-                  <TableCell className="font-medium">{profile.name}</TableCell>
-                  <TableCell>{profile.email}</TableCell>
-                  <TableCell>
-                    {loadingRoles ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Badge variant={isAdmin ? "default" : "secondary"}>
-                        {isAdmin ? "Admin" : "Gestor"}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button
-                        variant={isAdmin ? "destructive" : "outline"}
-                        size="sm"
-                        disabled={updating === profile.id}
-                        onClick={() => toggleAdmin(profile.id, isAdmin)}
-                      >
-                        {updating === profile.id && (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        {isAdmin ? "Remover Admin" : "Promover a Admin"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={resettingPassword === profile.id}
-                        onClick={() => handleResetPassword(profile.email, profile.id)}
-                      >
-                        {resettingPassword === profile.id ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                          <KeyRound className="mr-2 h-4 w-4" />
-                        )}
-                        Resetar Senha
-                      </Button>
-                    </div>
+    <div className="space-y-6">
+      {/* Gestores */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Gestores</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Função</TableHead>
+                <TableHead>Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {profiles.map((profile) => {
+                const isAdmin = userRoles[profile.id] || false;
+                return (
+                  <TableRow key={profile.id}>
+                    <TableCell className="font-medium">{profile.name}</TableCell>
+                    <TableCell>{profile.email}</TableCell>
+                    <TableCell>
+                      {loadingRoles ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Badge variant={isAdmin ? "default" : "secondary"}>
+                          {isAdmin ? "Admin" : "Gestor"}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          variant={isAdmin ? "destructive" : "outline"}
+                          size="sm"
+                          disabled={updating === profile.id}
+                          onClick={() => toggleAdmin(profile.id, isAdmin)}
+                        >
+                          {updating === profile.id && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          )}
+                          {isAdmin ? "Remover Admin" : "Promover a Admin"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={resettingPassword === profile.id}
+                          onClick={() => handleResetPassword(profile.email, profile.id)}
+                        >
+                          {resettingPassword === profile.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <KeyRound className="mr-2 h-4 w-4" />
+                          )}
+                          Resetar Senha
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+              {profiles.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    Nenhum gestor encontrado
                   </TableCell>
                 </TableRow>
-              );
-            })}
-            {profiles.length === 0 && (
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Participantes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Participantes</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-8">
-                  Nenhum usuário encontrado
-                </TableCell>
+                <TableHead>Apelido</TableHead>
+                <TableHead>Celular (últimos 4)</TableHead>
+                <TableHead>Bolão</TableHead>
+                <TableHead>Função</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {participants.map((participant, index) => (
+                <TableRow key={`${participant.apelido}-${index}`}>
+                  <TableCell className="font-medium">{participant.apelido}</TableCell>
+                  <TableCell>****-****-{participant.celular_ultimos4 || "????"}</TableCell>
+                  <TableCell>{participant.bolao_nome}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">Participante</Badge>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {participants.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} className="text-center py-8">
+                    Nenhum participante encontrado
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
