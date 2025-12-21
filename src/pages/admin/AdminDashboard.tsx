@@ -15,7 +15,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut } from "lucide-react";
+import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2 } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -42,6 +43,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"boloes" | "users">("boloes");
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -88,6 +90,30 @@ export default function AdminDashboard() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     window.location.href = "/admin/login";
+  };
+
+  const handleDeleteBolao = async (bolaoId: string, bolaoName: string) => {
+    setDeleting(bolaoId);
+    try {
+      // Delete related data first (apostas, jogos, mensagens)
+      await supabase.from("mensagens").delete().eq("bolao_id", bolaoId);
+      await supabase.from("jogos_selecionados").delete().eq("bolao_id", bolaoId);
+      await supabase.from("participant_sessions").delete().eq("bolao_id", bolaoId);
+      await supabase.from("apostas").delete().eq("bolao_id", bolaoId);
+      
+      // Delete the bolão
+      const { error } = await supabase.from("boloes").delete().eq("id", bolaoId);
+      
+      if (error) throw error;
+      
+      setBoloes(boloes.filter(b => b.id !== bolaoId));
+      toast.success(`Bolão "${bolaoName}" excluído com sucesso`);
+    } catch (error) {
+      console.error("Error deleting bolão:", error);
+      toast.error("Erro ao excluir bolão");
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const filteredBoloes = boloes.filter(
@@ -228,11 +254,46 @@ export default function AdminDashboard() {
                               })}
                             </TableCell>
                             <TableCell>
-                              <Button variant="ghost" size="sm" asChild>
-                                <Link to={`/admin/bolao/${bolao.id}`}>
-                                  <ExternalLink className="h-4 w-4" />
-                                </Link>
-                              </Button>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="sm" asChild>
+                                  <Link to={`/admin/bolao/${bolao.id}`}>
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      disabled={deleting === bolao.id}
+                                    >
+                                      {deleting === bolao.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      )}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Excluir bolão?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tem certeza que deseja excluir o bolão "{bolao.nome_do_bolao}"?
+                                        Esta ação é irreversível e removerá todas as apostas, mensagens e jogos associados.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction 
+                                        onClick={() => handleDeleteBolao(bolao.id, bolao.nome_do_bolao)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Excluir
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
