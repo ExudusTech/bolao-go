@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Trophy, Star, CheckCircle2, X } from "lucide-react";
+import { Trophy, Star, CheckCircle2, X, Bell, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MatchResult {
@@ -25,6 +25,7 @@ interface ResultSummary {
 
 interface LotteryResultsCheckerProps {
   bolaoId: string;
+  bolaoNome: string;
   lotteryType: string;
   savedNumeroConcurso?: number | null;
   savedNumerosSorteados?: number[] | null;
@@ -35,6 +36,7 @@ interface LotteryResultsCheckerProps {
 
 export function LotteryResultsChecker({ 
   bolaoId, 
+  bolaoNome,
   savedNumerosSorteados,
   savedResultadoVerificado,
   paidBets,
@@ -44,6 +46,7 @@ export function LotteryResultsChecker({
   const [results, setResults] = useState<MatchResult[]>([]);
   const [summary, setSummary] = useState<ResultSummary | null>(null);
   const [saving, setSaving] = useState(false);
+  const [notifying, setNotifying] = useState(false);
 
   const toggleNumber = (num: number) => {
     if (results.length > 0) return; // Don't allow changes after verification
@@ -139,6 +142,67 @@ export function LotteryResultsChecker({
   const resetVerification = () => {
     setResults([]);
     setSummary(null);
+  };
+
+  const handleNotifyParticipants = async () => {
+    if (!summary) {
+      toast.error("Verifique o resultado primeiro");
+      return;
+    }
+
+    setNotifying(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("Você precisa estar logado");
+        return;
+      }
+
+      // Build the notification message
+      const numbersStr = selectedNumbers.map(n => n.toString().padStart(2, "0")).join(", ");
+      
+      let resultParts: string[] = [];
+      if (summary.senas > 0) resultParts.push(`${summary.senas} Sena${summary.senas > 1 ? 's' : ''}`);
+      if (summary.quinas > 0) resultParts.push(`${summary.quinas} Quina${summary.quinas > 1 ? 's' : ''}`);
+      if (summary.quadras > 0) resultParts.push(`${summary.quadras} Quadra${summary.quadras > 1 ? 's' : ''}`);
+      
+      const resultStr = resultParts.length > 0 ? resultParts.join(", ") : "0 prêmios";
+      const hasPrize = summary.senas > 0 || summary.quinas > 0 || summary.quadras > 0;
+
+      let message = `🎰 Atenção participantes do Bolão ${bolaoNome}! Os números sorteados foram: ${numbersStr}! Nosso Bolão teve o seguinte resultado: ${resultStr}!`;
+
+      if (hasPrize) {
+        message += ` 🏆 Vamos dividir a bufunfa e gastar! Favor informar a sua chave PIX para o Gestor realizar o rateio do prêmio.`;
+      } else {
+        message += ` 💪 Não desanime! Erga essa cabeça, mete o pé e vai na fé... Manda essa tristeza embora... Basta acreditar que um novo dia vai raiar... Sua hora vai chegar!`;
+      }
+
+      // Send the message
+      const { error } = await supabase
+        .from('mensagens')
+        .insert({
+          bolao_id: bolaoId,
+          autor_nome: "Gestor",
+          autor_gestor_id: user.id,
+          conteudo: message
+        });
+
+      if (error) throw error;
+
+      // Update bolao to mark notification sent
+      await supabase
+        .from('boloes')
+        .update({ notificacao_aprovada: true })
+        .eq('id', bolaoId);
+
+      toast.success("Participantes notificados com sucesso!");
+    } catch (error) {
+      console.error("Error notifying participants:", error);
+      toast.error("Erro ao notificar participantes");
+    } finally {
+      setNotifying(false);
+    }
   };
 
   const getMatchBadgeVariant = (count: number) => {
@@ -255,6 +319,21 @@ export function LotteryResultsChecker({
                 {!savedResultadoVerificado && (
                   <Button onClick={handleSaveResults} disabled={saving}>
                     {saving ? "Salvando..." : "Salvar Resultado"}
+                  </Button>
+                )}
+                {summary && (
+                  <Button 
+                    onClick={handleNotifyParticipants} 
+                    disabled={notifying}
+                    variant="default"
+                    className="bg-success hover:bg-success/90"
+                  >
+                    {notifying ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Bell className="h-4 w-4 mr-2" />
+                    )}
+                    Notificar Participantes
                   </Button>
                 )}
               </>

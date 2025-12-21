@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, Send, Trash2, Bell } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { MessageCircle, Send, Trash2, Bell, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -57,6 +59,10 @@ export function MessagesPanel({
   const [sending, setSending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastMessageCountRef = useRef(0);
   const isFirstLoadRef = useRef(true);
@@ -208,19 +214,81 @@ export function MessagesPanel({
   }
 
   async function handleDeleteMessage(messageId: string) {
-    if (!isGestor) return;
-
     try {
-      const { error } = await supabase
-        .from('mensagens')
-        .delete()
-        .eq('id', messageId);
+      if (isGestor) {
+        const { error } = await supabase
+          .from('mensagens')
+          .delete()
+          .eq('id', messageId);
 
-      if (error) throw error;
+        if (error) throw error;
+      } else if (participantToken) {
+        const { data, error } = await supabase.rpc('delete_participant_message', {
+          p_bolao_id: bolaoId,
+          p_token: participantToken,
+          p_message_id: messageId
+        });
+
+        if (error) throw error;
+        
+        const result = data as { success: boolean; error?: string };
+        if (!result.success) {
+          toast.error(result.error || "Erro ao excluir mensagem");
+          return;
+        }
+      }
       toast.success("Mensagem excluída");
+      fetchMessages();
     } catch (error: any) {
       console.error('Error deleting message:', error);
       toast.error("Erro ao excluir mensagem");
+    }
+  }
+
+  async function handleEditMessage(message: Message) {
+    setEditingMessage(message);
+    setEditContent(message.conteudo);
+    setIsEditDialogOpen(true);
+  }
+
+  async function handleUpdateMessage() {
+    if (!editingMessage || !editContent.trim()) return;
+    
+    setIsUpdating(true);
+    try {
+      if (isGestor) {
+        const { error } = await supabase
+          .from('mensagens')
+          .update({ conteudo: editContent.trim() })
+          .eq('id', editingMessage.id);
+
+        if (error) throw error;
+      } else if (participantToken) {
+        const { data, error } = await supabase.rpc('update_participant_message', {
+          p_bolao_id: bolaoId,
+          p_token: participantToken,
+          p_message_id: editingMessage.id,
+          p_content: editContent.trim()
+        });
+
+        if (error) throw error;
+        
+        const result = data as { success: boolean; error?: string };
+        if (!result.success) {
+          toast.error(result.error || "Erro ao editar mensagem");
+          return;
+        }
+      }
+      toast.success("Mensagem atualizada");
+      setIsEditDialogOpen(false);
+      setEditingMessage(null);
+      setEditContent("");
+      fetchMessages();
+    } catch (error: any) {
+      console.error('Error updating message:', error);
+      toast.error("Erro ao editar mensagem");
+    } finally {
+      setIsUpdating(false);
     }
   }
 
@@ -286,12 +354,41 @@ export function MessagesPanel({
                         <span className="text-xs font-medium">
                           {isFromGestor ? '👑 Gestor' : msg.autor_nome}
                         </span>
-                        {isGestor && !isFromGestor && (
+                        {isOwnMessage && !isFromGestor && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 hover:bg-accent"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditMessage(msg);
+                              }}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMessage(msg.id);
+                              }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
+                        {isGestor && !isFromGestor && !isOwnMessage && (
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-4 w-4 hover:bg-destructive hover:text-destructive-foreground"
-                            onClick={() => handleDeleteMessage(msg.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteMessage(msg.id);
+                            }}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -332,6 +429,29 @@ export function MessagesPanel({
         )}
       </CardContent>
       )}
+
+      {/* Edit Message Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Mensagem</DialogTitle>
+          </DialogHeader>
+          <Textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            placeholder="Digite sua mensagem..."
+            className="min-h-[100px]"
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdateMessage} disabled={isUpdating || !editContent.trim()}>
+              {isUpdating ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
