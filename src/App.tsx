@@ -11,6 +11,8 @@ import BolaoDetalhes from "./pages/BolaoDetalhes";
 import Participar from "./pages/Participar";
 import ParticipantLogin from "./pages/ParticipantLogin";
 import ParticipanteDashboard from "./pages/ParticipanteDashboard";
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +33,8 @@ const App = () => (
           <Route path="/participar/:id/login" element={<ParticipantLogin />} />
           <Route path="/participar/:id/cadastro" element={<Participar />} />
           <Route path="/participante" element={<ParticipanteDashboard />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<AdminDashboard />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

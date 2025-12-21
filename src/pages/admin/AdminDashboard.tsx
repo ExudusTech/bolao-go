@@ -1,0 +1,388 @@
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { AdminGuard } from "@/components/layout/AdminGuard";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { toast } from "sonner";
+import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut } from "lucide-react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+
+interface Bolao {
+  id: string;
+  nome_do_bolao: string;
+  total_apostas: number;
+  created_at: string;
+  encerrado: boolean;
+  gestor_id: string;
+  gestor_name?: string;
+  gestor_email?: string;
+}
+
+interface Profile {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export default function AdminDashboard() {
+  const [boloes, setBoloes] = useState<Bolao[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<"boloes" | "users">("boloes");
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  async function fetchData() {
+    try {
+      // Fetch all bolões
+      const { data: boloesData, error: boloesError } = await supabase
+        .from("boloes")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (boloesError) throw boloesError;
+
+      // Fetch all profiles
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (profilesError) throw profilesError;
+
+      // Map gestor info to bolões
+      const boloesWithGestor = (boloesData || []).map((bolao) => {
+        const gestor = profilesData?.find((p) => p.id === bolao.gestor_id);
+        return {
+          ...bolao,
+          gestor_name: gestor?.name || "Desconhecido",
+          gestor_email: gestor?.email || "",
+        };
+      });
+
+      setBoloes(boloesWithGestor);
+      setProfiles(profilesData || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Erro ao carregar dados");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/admin/login";
+  };
+
+  const filteredBoloes = boloes.filter(
+    (bolao) =>
+      bolao.nome_do_bolao.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bolao.gestor_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      bolao.gestor_email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredProfiles = profiles.filter(
+    (profile) =>
+      profile.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      profile.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  return (
+    <AdminGuard>
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card">
+          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+            <div className="flex items-center gap-2">
+              <Shield className="h-6 w-6 text-primary" />
+              <h1 className="text-xl font-bold">Painel Administrativo</h1>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </Button>
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8">
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <>
+              {/* Stats */}
+              <div className="mb-8 grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total de Bolões</CardTitle>
+                    <Ticket className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{boloes.length}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total de Gestores</CardTitle>
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{profiles.length}</div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total de Apostas</CardTitle>
+                    <Ticket className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {boloes.reduce((acc, b) => acc + b.total_apostas, 0)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tabs */}
+              <div className="mb-4 flex gap-2">
+                <Button
+                  variant={activeTab === "boloes" ? "default" : "outline"}
+                  onClick={() => setActiveTab("boloes")}
+                >
+                  <Ticket className="mr-2 h-4 w-4" />
+                  Bolões
+                </Button>
+                <Button
+                  variant={activeTab === "users" ? "default" : "outline"}
+                  onClick={() => setActiveTab("users")}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Usuários
+                </Button>
+              </div>
+
+              {/* Search */}
+              <div className="mb-4 relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {activeTab === "boloes" ? (
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Bolão</TableHead>
+                          <TableHead>Gestor</TableHead>
+                          <TableHead>Apostas</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Criado em</TableHead>
+                          <TableHead>Ações</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredBoloes.map((bolao) => (
+                          <TableRow key={bolao.id}>
+                            <TableCell className="font-medium">
+                              {bolao.nome_do_bolao}
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{bolao.gestor_name}</div>
+                                <div className="text-sm text-muted-foreground">
+                                  {bolao.gestor_email}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>{bolao.total_apostas}</TableCell>
+                            <TableCell>
+                              <Badge variant={bolao.encerrado ? "secondary" : "default"}>
+                                {bolao.encerrado ? "Encerrado" : "Ativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {format(new Date(bolao.created_at), "dd/MM/yyyy", {
+                                locale: ptBR,
+                              })}
+                            </TableCell>
+                            <TableCell>
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link to={`/bolao/${bolao.id}`}>
+                                  <ExternalLink className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {filteredBoloes.length === 0 && (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8">
+                              Nenhum bolão encontrado
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ) : (
+                <AdminUsersTab
+                  profiles={filteredProfiles}
+                  onRefresh={fetchData}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
+    </AdminGuard>
+  );
+}
+
+interface AdminUsersTabProps {
+  profiles: Profile[];
+  onRefresh: () => void;
+}
+
+function AdminUsersTab({ profiles, onRefresh }: AdminUsersTabProps) {
+  const [userRoles, setUserRoles] = useState<Record<string, boolean>>({});
+  const [loadingRoles, setLoadingRoles] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [profiles]);
+
+  async function fetchRoles() {
+    try {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id, role");
+
+      if (error) throw error;
+
+      const roles: Record<string, boolean> = {};
+      data?.forEach((r) => {
+        if (r.role === "admin") {
+          roles[r.user_id] = true;
+        }
+      });
+      setUserRoles(roles);
+    } catch (error) {
+      console.error("Error fetching roles:", error);
+    } finally {
+      setLoadingRoles(false);
+    }
+  }
+
+  async function toggleAdmin(userId: string, isCurrentlyAdmin: boolean) {
+    setUpdating(userId);
+    try {
+      if (isCurrentlyAdmin) {
+        // Remove admin role
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", "admin");
+
+        if (error) throw error;
+        toast.success("Permissão de admin removida");
+      } else {
+        // Add admin role
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({ user_id: userId, role: "admin" });
+
+        if (error) throw error;
+        toast.success("Usuário promovido a admin");
+      }
+
+      fetchRoles();
+    } catch (error) {
+      console.error("Error updating role:", error);
+      toast.error("Erro ao atualizar permissões");
+    } finally {
+      setUpdating(null);
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Nome</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Função</TableHead>
+              <TableHead>Ações</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {profiles.map((profile) => {
+              const isAdmin = userRoles[profile.id] || false;
+              return (
+                <TableRow key={profile.id}>
+                  <TableCell className="font-medium">{profile.name}</TableCell>
+                  <TableCell>{profile.email}</TableCell>
+                  <TableCell>
+                    {loadingRoles ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Badge variant={isAdmin ? "default" : "secondary"}>
+                        {isAdmin ? "Admin" : "Gestor"}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant={isAdmin ? "destructive" : "outline"}
+                      size="sm"
+                      disabled={updating === profile.id}
+                      onClick={() => toggleAdmin(profile.id, isAdmin)}
+                    >
+                      {updating === profile.id && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      {isAdmin ? "Remover Admin" : "Promover a Admin"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+            {profiles.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} className="text-center py-8">
+                  Nenhum usuário encontrado
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
