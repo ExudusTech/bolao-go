@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BetsTable } from "@/components/bolao/BetsTable";
@@ -75,6 +75,8 @@ interface GameSelection {
 
 export default function BolaoDetalhes() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin/");
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [apostas, setApostas] = useState<Aposta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -477,7 +479,7 @@ export default function BolaoDetalhes() {
           <main className="container py-8 px-4 text-center">
             <p className="text-muted-foreground">Bolão não encontrado</p>
             <Button asChild className="mt-4">
-              <Link to="/gestor/dashboard">Voltar ao Dashboard</Link>
+              <Link to={isAdminRoute ? "/admin" : "/gestor/dashboard"}>Voltar ao Dashboard</Link>
             </Button>
           </main>
         </div>
@@ -493,7 +495,7 @@ export default function BolaoDetalhes() {
           <div className="space-y-4 sm:space-y-6">
             {/* Back Button */}
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/gestor/dashboard">
+              <Link to={isAdminRoute ? "/admin" : "/gestor/dashboard"}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Voltar
               </Link>

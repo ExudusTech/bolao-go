@@ -229,7 +229,7 @@ export default function AdminDashboard() {
                             </TableCell>
                             <TableCell>
                               <Button variant="ghost" size="sm" asChild>
-                                <Link to={`/bolao/${bolao.id}`}>
+                                <Link to={`/admin/bolao/${bolao.id}`}>
                                   <ExternalLink className="h-4 w-4" />
                                 </Link>
                               </Button>
