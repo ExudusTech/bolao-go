@@ -123,10 +123,12 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
 
     // Check for duplicate bets
     setCheckingDuplicate(true);
+    const celularToCheck = participantInfo?.celular || data.celular;
     const { data: duplicateCheck, error: duplicateError } = await supabase.rpc('check_duplicate_bet', {
       p_bolao_id: bolaoId,
       p_dezenas: selectedNumbers,
-    }) as { data: { allowed: boolean; message?: string; duplicate_of?: string } | null; error: unknown };
+      p_celular: celularToCheck,
+    }) as { data: { allowed: boolean; message?: string; duplicate_of?: string; same_participant?: boolean } | null; error: unknown };
     setCheckingDuplicate(false);
 
     if (duplicateError) {
@@ -135,9 +137,16 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
       setIsLoading(false);
       setShakeForm(true);
       setTimeout(() => setShakeForm(false), 320);
-      toast.error(`Estas dezenas já foram registradas por "${duplicateCheck.duplicate_of}". Por favor, escolha outros números.`, {
-        duration: 6000,
-      });
+      
+      if (duplicateCheck.same_participant) {
+        toast.error("Você já realizou essa aposta nesse Bolão. Informe novos números se desejar adquirir mais uma cota.", {
+          duration: 6000,
+        });
+      } else {
+        toast.error(`Estas dezenas já foram registradas por "${duplicateCheck.duplicate_of}". Por favor, escolha outros números.`, {
+          duration: 6000,
+        });
+      }
       return;
     }
 

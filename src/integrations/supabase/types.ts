@@ -324,10 +324,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_duplicate_bet: {
-        Args: { p_bolao_id: string; p_dezenas: number[] }
-        Returns: Json
-      }
+      check_duplicate_bet:
+        | { Args: { p_bolao_id: string; p_dezenas: number[] }; Returns: Json }
+        | {
+            Args: {
+              p_bolao_id: string
+              p_celular?: string
+              p_dezenas: number[]
+            }
+            Returns: Json
+          }
       delete_participant_message: {
         Args: { p_bolao_id: string; p_message_id: string; p_token: string }
         Returns: Json
