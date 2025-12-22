@@ -411,6 +411,10 @@ export type Database = {
         Returns: boolean
       }
       validate_participant_token: { Args: { p_token: string }; Returns: Json }
+      verify_participant_global_login: {
+        Args: { p_apelido: string; p_senha: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "user"

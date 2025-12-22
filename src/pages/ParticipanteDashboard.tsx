@@ -151,16 +151,22 @@ export default function ParticipanteDashboard() {
     
     setIsLoggingIn(true);
     
-    // Verify credentials by checking if there's an aposta with this apelido and last 4 digits
-    const { data: apostasCheck, error: checkError } = await supabase
-      .from("apostas")
-      .select("id, celular_ultimos4")
-      .ilike("apelido", apelido.trim())
-      .eq("celular_ultimos4", senha)
-      .limit(1);
+    // Verify credentials using secure RPC function
+    const { data, error } = await supabase.rpc("verify_participant_global_login", {
+      p_apelido: apelido.trim(),
+      p_senha: senha
+    });
     
-    if (checkError || !apostasCheck || apostasCheck.length === 0) {
-      toast.error("Credenciais inválidas. Verifique seu apelido e senha.");
+    if (error) {
+      toast.error("Erro ao verificar credenciais. Tente novamente.");
+      setIsLoggingIn(false);
+      return;
+    }
+    
+    const result = data as { success: boolean; error?: string; apelido?: string };
+    
+    if (!result.success) {
+      toast.error(result.error || "Credenciais inválidas. Verifique seu apelido e senha.");
       setIsLoggingIn(false);
       return;
     }
@@ -168,12 +174,12 @@ export default function ParticipanteDashboard() {
     // Store session
     const newSession: ParticipantSession = {
       token: crypto.randomUUID(),
-      apelido: apelido.trim(),
+      apelido: result.apelido || apelido.trim(),
     };
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newSession));
     setSession(newSession);
-    toast.success(`Bem-vindo(a), ${apelido.trim()}!`);
+    toast.success(`Bem-vindo(a), ${result.apelido || apelido.trim()}!`);
     setIsLoggingIn(false);
   };
 
