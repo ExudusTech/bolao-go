@@ -23,9 +23,9 @@ export function useParticipantAuth(bolaoId?: string): UseParticipantAuthReturn {
   const [session, setSession] = useState<ParticipantSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load session from localStorage on mount
+  // Load session from sessionStorage on mount (cleared when tab closes)
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as ParticipantSession;
@@ -34,7 +34,7 @@ export function useParticipantAuth(bolaoId?: string): UseParticipantAuthReturn {
           setSession(parsed);
         }
       } catch (e) {
-        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
       }
     }
     setIsLoading(false);
@@ -54,7 +54,7 @@ export function useParticipantAuth(bolaoId?: string): UseParticipantAuthReturn {
       
       if (!result.valid) {
         // Clear invalid session
-        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
         setSession(null);
         return false;
       }
@@ -101,7 +101,7 @@ export function useParticipantAuth(bolaoId?: string): UseParticipantAuthReturn {
         bolaoId: loginBolaoId
       };
 
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newSession));
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(newSession));
       setSession(newSession);
 
       return { success: true };
@@ -118,7 +118,7 @@ export function useParticipantAuth(bolaoId?: string): UseParticipantAuthReturn {
         // Ignore logout errors
       }
     }
-    localStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(STORAGE_KEY);
     setSession(null);
   }, [session?.token]);
 
