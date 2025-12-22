@@ -65,12 +65,26 @@ export function ParticipantMessagesPanel({
     }
 
     const newCount = newMessages.length - lastMessageCountRef.current;
-    if (newCount > 0 && !isExpanded) {
-      setUnreadCount(prev => prev + newCount);
-      playNotificationSound();
+    if (newCount > 0) {
+      // Check if the new message is not from the current participant
+      const latestMessages = newMessages.slice(-newCount);
+      const hasMessagesFromOthers = latestMessages.some(
+        msg => msg.autor_nome.toLowerCase() !== participantApelido.toLowerCase()
+      );
+      
+      if (hasMessagesFromOthers) {
+        if (!isExpanded) {
+          setUnreadCount(prev => prev + newCount);
+        }
+        playNotificationSound();
+        toast.info("Nova mensagem no bolão!", {
+          description: `${latestMessages[latestMessages.length - 1]?.autor_nome || 'Alguém'} enviou uma mensagem`,
+          duration: 5000,
+        });
+      }
     }
     lastMessageCountRef.current = newMessages.length;
-  }, [isExpanded]);
+  }, [isExpanded, participantApelido]);
 
   useEffect(() => {
     fetchMessages();
@@ -163,17 +177,19 @@ export function ParticipantMessagesPanel({
   };
 
   return (
-    <Card>
+    <Card className={unreadCount > 0 ? "ring-2 ring-primary animate-pulse" : ""}>
       <CardHeader 
-        className="pb-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg"
+        className={`pb-3 cursor-pointer hover:bg-muted/50 transition-colors rounded-t-lg ${
+          unreadCount > 0 ? "bg-primary/10" : ""
+        }`}
         onClick={isExpanded ? handleCollapse : handleExpand}
       >
         <CardTitle className="flex items-center justify-between text-lg">
           <div className="flex items-center gap-2">
-            <MessageCircle className="h-5 w-5" />
+            <MessageCircle className={`h-5 w-5 ${unreadCount > 0 ? "text-primary" : ""}`} />
             Mensagens do Bolão
             {unreadCount > 0 && (
-              <Badge variant="destructive" className="animate-pulse flex items-center gap-1">
+              <Badge variant="destructive" className="animate-bounce flex items-center gap-1">
                 <Bell className="h-3 w-3" />
                 {unreadCount} {unreadCount === 1 ? 'nova' : 'novas'}
               </Badge>
