@@ -1,13 +1,12 @@
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { BolaoCard } from "@/components/bolao/BolaoCard";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Plus, Loader2, FolderOpen } from "lucide-react";
+import { Loader2, FolderOpen } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Bolao {
   id: string;
@@ -20,10 +19,33 @@ interface Bolao {
   resultado_verificado: boolean;
 }
 
+type FilterType = "todos" | "ativos" | "encerrados" | "com_resultado";
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [boloes, setBoloes] = useState<Bolao[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterType>("todos");
+
+  const filteredBoloes = useMemo(() => {
+    switch (filter) {
+      case "ativos":
+        return boloes.filter((b) => !b.encerrado);
+      case "encerrados":
+        return boloes.filter((b) => b.encerrado && !b.resultado_verificado);
+      case "com_resultado":
+        return boloes.filter((b) => b.resultado_verificado);
+      default:
+        return boloes;
+    }
+  }, [boloes, filter]);
+
+  const counts = useMemo(() => ({
+    todos: boloes.length,
+    ativos: boloes.filter((b) => !b.encerrado).length,
+    encerrados: boloes.filter((b) => b.encerrado && !b.resultado_verificado).length,
+    com_resultado: boloes.filter((b) => b.resultado_verificado).length,
+  }), [boloes]);
 
   useEffect(() => {
     if (user) {
@@ -51,11 +73,32 @@ export default function Dashboard() {
         <main className="container py-8 px-4 flex-1">
           <div className="flex flex-col gap-6">
             {/* Header */}
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Seus Bolões</h1>
-              <p className="text-muted-foreground">
-                Gerencie seus bolões e acompanhe as apostas
-              </p>
+            <div className="flex flex-col gap-4">
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Seus Bolões</h1>
+                <p className="text-muted-foreground">
+                  Gerencie seus bolões e acompanhe as apostas
+                </p>
+              </div>
+              
+              {boloes.length > 0 && (
+                <Tabs value={filter} onValueChange={(v) => setFilter(v as FilterType)}>
+                  <TabsList className="w-full sm:w-auto">
+                    <TabsTrigger value="todos" className="flex-1 sm:flex-none">
+                      Todos ({counts.todos})
+                    </TabsTrigger>
+                    <TabsTrigger value="ativos" className="flex-1 sm:flex-none">
+                      Ativos ({counts.ativos})
+                    </TabsTrigger>
+                    <TabsTrigger value="encerrados" className="flex-1 sm:flex-none">
+                      Encerrados ({counts.encerrados})
+                    </TabsTrigger>
+                    <TabsTrigger value="com_resultado" className="flex-1 sm:flex-none">
+                      Com Resultado ({counts.com_resultado})
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              )}
             </div>
 
             {/* Content */}
@@ -73,9 +116,19 @@ export default function Dashboard() {
                   Crie seu primeiro bolão clicando em "Novo Bolão" no menu acima
                 </p>
               </div>
+            ) : filteredBoloes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+                <div className="mb-4 rounded-full bg-muted p-4">
+                  <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <h2 className="text-lg font-semibold">Nenhum bolão encontrado</h2>
+                <p className="text-muted-foreground">
+                  Não há bolões com o filtro selecionado
+                </p>
+              </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {boloes.map((bolao, index) => (
+                {filteredBoloes.map((bolao, index) => (
                   <BolaoCard
                     key={bolao.id}
                     id={bolao.id}
