@@ -8,13 +8,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, LogOut, Users, Calendar, ChevronRight, Eye, User, Clock, Trophy } from "lucide-react";
+import { Loader2, LogOut, Users, Calendar, ChevronRight, User, Clock, Trophy, Grid3X3, BarChart3 } from "lucide-react";
 import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
 import { cn } from "@/lib/utils";
 import { ParticipantMessagesPanel } from "@/components/bolao/ParticipantMessagesPanel";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
+import { NumbersGrid } from "@/components/bolao/NumbersGrid";
+import { NumberRankingAnalysis } from "@/components/bolao/NumberRankingAnalysis";
 
 interface ParticipantSession {
   token: string;
@@ -433,19 +435,45 @@ export default function ParticipanteDashboard() {
                   <p className="text-xs text-muted-foreground">Suas apostas</p>
                 </div>
               </div>
-              
-              <div className="mt-4">
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => navigate(`/participar/${selectedBolao.id}`)}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Ver Bolão Completo
-                </Button>
-              </div>
             </CardContent>
           </Card>
+
+          {/* Mapa de Números Escolhidos */}
+          <CollapsibleSection
+            title="Mapa de Números Escolhidos"
+            description="Visualização dos números apostados"
+            icon={<Grid3X3 className="h-5 w-5" />}
+            defaultOpen={true}
+          >
+            {loadingDetalhes ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <NumbersGrid 
+                apostas={allApostadores.map(a => ({ dezenas: a.dezenas }))} 
+                showCounts 
+              />
+            )}
+          </CollapsibleSection>
+
+          {/* Análise dos Números */}
+          <CollapsibleSection
+            title="Análise dos Números"
+            description={`Ranking baseado em ${allApostadores.length} apostas`}
+            icon={<BarChart3 className="h-5 w-5" />}
+            defaultOpen={true}
+          >
+            {loadingDetalhes ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            ) : (
+              <NumberRankingAnalysis 
+                apostas={allApostadores.map(a => ({ dezenas: a.dezenas }))} 
+              />
+            )}
+          </CollapsibleSection>
 
           {/* Lista de Apostadores */}
           <CollapsibleSection
