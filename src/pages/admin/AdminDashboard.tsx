@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2, KeyRound, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2, KeyRound, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -66,6 +66,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState<"boloes" | "users">("boloes");
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [recalculating, setRecalculating] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -203,6 +204,28 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleRecalculateCounters = async () => {
+    setRecalculating(true);
+    try {
+      const { data, error } = await supabase.rpc('recalculate_all_apostas_counters');
+      
+      if (error) throw error;
+      
+      const result = data as { updated_boloes: number };
+      if (result.updated_boloes > 0) {
+        toast.success(`${result.updated_boloes} bolão(ões) corrigido(s)`);
+        fetchData(); // Refresh data
+      } else {
+        toast.success("Todos os contadores já estão corretos");
+      }
+    } catch (error) {
+      console.error("Error recalculating counters:", error);
+      toast.error("Erro ao recalcular contadores");
+    } finally {
+      setRecalculating(false);
+    }
+  };
+
   const filteredBoloes = boloes.filter(
     (bolao) =>
       bolao.nome_do_bolao.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -225,10 +248,25 @@ export default function AdminDashboard() {
               <Shield className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-bold">Painel Administrativo</h1>
             </div>
-            <Button variant="outline" size="sm" onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Sair
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRecalculateCounters}
+                disabled={recalculating}
+              >
+                {recalculating ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Sincronizar Contadores
+              </Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>
+                <LogOut className="mr-2 h-4 w-4" />
+                Sair
+              </Button>
+            </div>
           </div>
         </header>
 
