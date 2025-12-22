@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
+import { MaintenanceScreen } from "@/components/layout/MaintenanceScreen";
 import { BetsTable } from "@/components/bolao/BetsTable";
 import { GameSuggestions, SuggestedGame, GameCriteria, SkippedGame } from "@/components/bolao/GameSuggestions";
 import { GameSelectionDialog } from "@/components/bolao/GameSelectionDialog";
@@ -19,6 +20,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { useAdmin } from "@/hooks/useAdmin";
 import { toast } from "sonner";
 import { Loader2, RefreshCw, Download, Copy, ArrowLeft, Users, Key, FileText, DollarSign, Sparkles, Ticket, BarChart3, Lock, LockOpen, Table, Grid3X3, CalendarIcon, Clock, X } from "lucide-react";
 import { LOTTERY_TYPES } from "@/lib/validations";
@@ -78,6 +81,8 @@ export default function BolaoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin/");
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading, refreshStatus } = useMaintenanceMode();
+  const { isAdmin } = useAdmin();
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [apostas, setApostas] = useState<Aposta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -461,7 +466,7 @@ export default function BolaoDetalhes() {
     }
   };
 
-  if (loading) {
+  if (loading || maintenanceLoading) {
     return (
       <AuthGuard>
         <div className="min-h-screen bg-background">
@@ -470,6 +475,15 @@ export default function BolaoDetalhes() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </main>
         </div>
+      </AuthGuard>
+    );
+  }
+
+  // Show maintenance screen for non-admins
+  if (isMaintenanceMode && !isAdmin) {
+    return (
+      <AuthGuard>
+        <MaintenanceScreen message={maintenanceMessage} onRefresh={refreshStatus} />
       </AuthGuard>
     );
   }
