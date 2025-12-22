@@ -367,6 +367,7 @@ export type Database = {
         Args: { p_bolao_id: string; p_token: string }
         Returns: Json
       }
+      get_participant_apostas: { Args: { p_apelido: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

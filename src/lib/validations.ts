@@ -51,7 +51,10 @@ export const createBolaoSchema = z.object({
 });
 
 export const apostasSchema = z.object({
-  apelido: z.string().min(2, "Apelido deve ter no mínimo 2 caracteres").max(50, "Apelido muito longo"),
+  apelido: z.string()
+    .min(2, "Apelido deve ter no mínimo 2 caracteres")
+    .max(30, "Apelido muito longo")
+    .regex(/^[a-zA-ZÀ-ÿ0-9]+$/, "Apelido deve ser uma única palavra, sem espaços ou caracteres especiais"),
   celular: z.string()
     .transform((val) => {
       // Format is "CC:digits" (e.g., "BR:11999999999")
