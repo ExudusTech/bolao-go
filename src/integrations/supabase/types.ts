@@ -338,6 +338,7 @@ export type Database = {
         Args: { p_bolao_id: string; p_message_id: string; p_token: string }
         Returns: Json
       }
+      get_bolao_apostas_public: { Args: { p_bolao_id: string }; Returns: Json }
       get_bolao_for_participation: {
         Args: { bolao_id: string }
         Returns: {
