@@ -289,6 +289,16 @@ export default function Participar() {
             </p>
           )}
 
+          {/* Login Button for unauthenticated users */}
+          {!session && (
+            <Button asChild variant="outline" className="animate-fade-in">
+              <Link to={`/participar/${id}/login`}>
+                <LogIn className="h-4 w-4 mr-2" />
+                Já tenho aposta - Fazer login
+              </Link>
+            </Button>
+          )}
+
           {/* Bet Form - pass payment info only if authenticated */}
           <BetForm
             bolaoId={bolao.id}
