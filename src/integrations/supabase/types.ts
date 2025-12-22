@@ -385,6 +385,7 @@ export type Database = {
         Returns: Json
       }
       participant_logout: { Args: { p_token: string }; Returns: Json }
+      recalculate_all_apostas_counters: { Args: never; Returns: Json }
       send_participant_message: {
         Args: { p_bolao_id: string; p_content: string; p_token: string }
         Returns: Json
