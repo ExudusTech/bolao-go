@@ -344,6 +344,7 @@ export type Database = {
           chave_pix: string
           created_at: string
           data_limite_apostas: string
+          data_sorteio: string
           encerrado: boolean
           gestor_name: string
           id: string

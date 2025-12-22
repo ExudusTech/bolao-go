@@ -8,9 +8,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, LogOut, Users, Calendar, TrendingUp, TrendingDown, ChevronRight, Eye } from "lucide-react";
+import { Loader2, LogOut, Users, Calendar, ChevronRight, Eye, User, Clock, Trophy, MessageCircle } from "lucide-react";
 import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
 import { cn } from "@/lib/utils";
+import { MessagesPanel } from "@/components/bolao/MessagesPanel";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { CollapsibleSection } from "@/components/ui/collapsible-section";
 
 interface ParticipantSession {
   token: string;
@@ -24,6 +28,9 @@ interface BolaoParticipacao {
   total_apostas: number;
   encerrado: boolean;
   data_sorteio?: string | null;
+  data_limite_apostas?: string | null;
+  gestor_name?: string | null;
+  valor_cota?: number;
   numeros_sorteados?: number[] | null;
   resultado_verificado?: boolean;
   minhasApostas: Array<{
@@ -33,10 +40,11 @@ interface BolaoParticipacao {
   }>;
 }
 
-interface NumberRanking {
-  number: number;
-  count: number;
-  rank: number;
+interface Apostador {
+  id: string;
+  apelido: string;
+  dezenas: number[];
+  created_at: string;
 }
 
 const STORAGE_KEY = "participant_global_session";
@@ -49,8 +57,9 @@ export default function ParticipanteDashboard() {
   const [boloes, setBoloes] = useState<BolaoParticipacao[]>([]);
   const [loadingBoloes, setLoadingBoloes] = useState(false);
   const [selectedBolao, setSelectedBolao] = useState<BolaoParticipacao | null>(null);
-  const [bolaoApostas, setBolaoApostas] = useState<Array<{ dezenas: number[] }>>([]);
+  const [allApostadores, setAllApostadores] = useState<Apostador[]>([]);
   const [loadingDetalhes, setLoadingDetalhes] = useState(false);
+  const [participantToken, setParticipantToken] = useState<string | null>(null);
 
   // Login form state
   const [apelido, setApelido] = useState("");
@@ -116,7 +125,10 @@ export default function ParticipanteDashboard() {
           created_at: bolaoInfo.created_at,
           total_apostas: bolaoInfo.total_apostas,
           encerrado: bolaoInfo.encerrado,
-          data_sorteio: null, // Not returned by get_bolao_for_participation currently
+          data_sorteio: bolaoInfo.data_sorteio,
+          data_limite_apostas: bolaoInfo.data_limite_apostas,
+          gestor_name: bolaoInfo.gestor_name,
+          valor_cota: bolaoInfo.valor_cota,
           numeros_sorteados: bolaoInfo.numeros_sorteados,
           resultado_verificado: bolaoInfo.resultado_verificado,
           minhasApostas,
@@ -179,39 +191,25 @@ export default function ParticipanteDashboard() {
     setSelectedBolao(bolao);
     setLoadingDetalhes(true);
     
-    // Fetch all apostas for this bolão
-    const { data, error } = await supabase.rpc("get_bolao_for_participation", {
-      bolao_id: bolao.id
-    });
+    // Fetch all apostas for this bolão using a generic RPC call
+    const { data, error } = await supabase
+      .rpc("get_bolao_apostas_public" as any, { p_bolao_id: bolao.id });
     
-    if (!error && data && data.length > 0) {
-      // We need to get the actual apostas to compute ranking
-      // For now, use the total_apostas count and simulate ranking
-      // Since we can't access other participants' dezenas directly from RPC
-      // We'll show only the user's numbers
+    if (!error && data) {
+      const result = data as unknown as { success: boolean; apostas?: Apostador[] };
+      if (result.success && result.apostas) {
+        setAllApostadores(result.apostas);
+      }
+    }
+    
+    // Try to get participant token for messages
+    // We use the same login to validate
+    if (session) {
+      setParticipantToken(session.token);
     }
     
     setLoadingDetalhes(false);
   };
-
-  // Calculate ranking for user's numbers
-  const numberRankings = useMemo(() => {
-    if (!selectedBolao) return new Map<string, NumberRanking[]>();
-    
-    const rankings = new Map<string, NumberRanking[]>();
-    
-    // Without access to all apostas, show user's selected numbers
-    selectedBolao.minhasApostas.forEach(aposta => {
-      const apostaRankings: NumberRanking[] = aposta.dezenas.map((num, idx) => ({
-        number: num,
-        count: 0, // Would need all apostas to calculate
-        rank: idx + 1,
-      }));
-      rankings.set(aposta.id, apostaRankings);
-    });
-    
-    return rankings;
-  }, [selectedBolao]);
 
   if (isLoading) {
     return (
@@ -297,7 +295,7 @@ export default function ParticipanteDashboard() {
         <header className="border-b bg-card">
           <div className="container py-4 px-4 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => setSelectedBolao(null)}>
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedBolao(null); setAllApostadores([]); }}>
                 ← Voltar
               </Button>
               <div>
@@ -314,77 +312,189 @@ export default function ParticipanteDashboard() {
           </div>
         </header>
         
-        <main className="container py-6 px-4 flex-1">
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Suas Apostas</CardTitle>
-                <CardDescription>
-                  Confira seus números registrados neste bolão
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {loadingDetalhes ? (
-                  <div className="flex justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : (
-                  selectedBolao.minhasApostas.map((aposta, index) => (
-                    <div key={aposta.id} className="p-4 rounded-lg bg-muted/50 border">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium">Aposta #{index + 1}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(aposta.created_at).toLocaleDateString("pt-BR")}
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {aposta.dezenas.sort((a, b) => a - b).map((num) => (
-                          <span
-                            key={num}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-sm"
-                          >
-                            {num.toString().padStart(2, "0")}
-                          </span>
-                        ))}
-                      </div>
+        <main className="container py-6 px-4 flex-1 space-y-4">
+          {/* Informações do Bolão */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Trophy className="h-5 w-5" />
+                Informações do Bolão
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {selectedBolao.gestor_name && (
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Organizador</span>
                     </div>
-                  ))
+                    <p className="font-medium text-sm">{selectedBolao.gestor_name}</p>
+                  </div>
                 )}
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Estatísticas do Bolão
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <p className="text-2xl font-bold text-primary">{selectedBolao.total_apostas}</p>
-                    <p className="text-xs text-muted-foreground">Total de apostas</p>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Criado em</span>
                   </div>
-                  <div className="p-3 rounded-lg bg-muted/50 text-center">
-                    <p className="text-2xl font-bold text-success">{selectedBolao.minhasApostas.length}</p>
-                    <p className="text-xs text-muted-foreground">Suas apostas</p>
+                  <p className="font-medium text-sm">
+                    {format(new Date(selectedBolao.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
+                </div>
+                {selectedBolao.data_limite_apostas && (
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Limite p/ apostas</span>
+                    </div>
+                    <p className="font-medium text-sm">
+                      {format(new Date(selectedBolao.data_limite_apostas), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                    </p>
                   </div>
+                )}
+                {selectedBolao.data_sorteio && (
+                  <div className="p-3 rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Trophy className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">Data do sorteio</span>
+                    </div>
+                    <p className="font-medium text-sm">
+                      {format(new Date(selectedBolao.data_sorteio), "dd/MM/yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {selectedBolao.valor_cota && (
+                <div className="mt-4 p-3 rounded-lg bg-primary/10 border border-primary/20">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Valor por cota:</span>{" "}
+                    <span className="font-bold text-primary">
+                      R$ {selectedBolao.valor_cota.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </p>
                 </div>
-                
-                <div className="mt-4">
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    onClick={() => navigate(`/participar/${selectedBolao.id}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Ver Bolão Completo
-                  </Button>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Suas Apostas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Suas Apostas</CardTitle>
+              <CardDescription>
+                Confira seus números registrados neste bolão
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingDetalhes ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                selectedBolao.minhasApostas.map((aposta, index) => (
+                  <div key={aposta.id} className="p-4 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-medium">Aposta #{index + 1}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(aposta.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {aposta.dezenas.sort((a, b) => a - b).map((num) => (
+                        <span
+                          key={num}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground font-semibold text-sm"
+                        >
+                          {num.toString().padStart(2, "0")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Estatísticas */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Estatísticas do Bolão
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-2xl font-bold text-primary">{selectedBolao.total_apostas}</p>
+                  <p className="text-xs text-muted-foreground">Total de apostas</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 text-center">
+                  <p className="text-2xl font-bold text-success">{selectedBolao.minhasApostas.length}</p>
+                  <p className="text-xs text-muted-foreground">Suas apostas</p>
+                </div>
+              </div>
+              
+              <div className="mt-4">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => navigate(`/participar/${selectedBolao.id}`)}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Ver Bolão Completo
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Lista de Apostadores */}
+          <CollapsibleSection
+            title={`Todos os Apostadores (${allApostadores.length})`}
+            icon={<Users className="h-5 w-5" />}
+            defaultOpen={false}
+          >
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {loadingDetalhes ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : allApostadores.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Nenhum apostador encontrado
+                </p>
+              ) : (
+                allApostadores.map((apostador, index) => (
+                  <div key={apostador.id} className="p-3 rounded-lg bg-muted/50 border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{apostador.apelido}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(apostador.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {apostador.dezenas.sort((a, b) => a - b).map((num) => (
+                        <span
+                          key={num}
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-muted text-foreground font-medium text-xs border"
+                        >
+                          {num.toString().padStart(2, "0")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </CollapsibleSection>
+
+          {/* Mensagens */}
+          <MessagesPanel
+            bolaoId={selectedBolao.id}
+            isGestor={false}
+            participantToken={participantToken || undefined}
+            participantApelido={session?.apelido}
+          />
         </main>
         <Footer />
       </div>
