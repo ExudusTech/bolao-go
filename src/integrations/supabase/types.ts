@@ -361,6 +361,7 @@ export type Database = {
         Args: { p_bolao_id: string; p_token: string }
         Returns: Json
       }
+      get_bolao_messages_public: { Args: { p_bolao_id: string }; Returns: Json }
       get_bolao_number_counts: { Args: { p_bolao_id: string }; Returns: Json }
       get_bolao_payment_info: {
         Args: { p_bolao_id: string; p_token: string }
@@ -390,6 +391,10 @@ export type Database = {
       recalculate_all_apostas_counters: { Args: never; Returns: Json }
       send_participant_message: {
         Args: { p_bolao_id: string; p_content: string; p_token: string }
+        Returns: Json
+      }
+      send_participant_message_by_apelido: {
+        Args: { p_apelido: string; p_bolao_id: string; p_content: string }
         Returns: Json
       }
       update_participant_message: {
