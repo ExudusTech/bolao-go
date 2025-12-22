@@ -20,6 +20,7 @@ import { Loader2, Shield, Users, Ticket, Search, ExternalLink, LogOut, Trash2, K
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { MaintenanceToggle } from "@/components/admin/MaintenanceToggle";
 
 interface Bolao {
   id: string;
@@ -277,6 +278,11 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
+              {/* Maintenance Mode Toggle */}
+              <div className="mb-8">
+                <MaintenanceToggle />
+              </div>
+
               {/* Stats */}
               <div className="mb-8 grid gap-4 md:grid-cols-3">
                 <Card>

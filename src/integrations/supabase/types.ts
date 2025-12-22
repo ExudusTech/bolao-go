@@ -342,6 +342,30 @@ export type Database = {
           },
         ]
       }
+      system_settings: {
+        Row: {
+          id: string
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          id?: string
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Update: {
+          id?: string
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -381,6 +405,7 @@ export type Database = {
             }
             Returns: Json
           }
+      check_maintenance_mode: { Args: never; Returns: boolean }
       delete_participant_message: {
         Args: { p_bolao_id: string; p_message_id: string; p_token: string }
         Returns: Json
@@ -435,6 +460,7 @@ export type Database = {
         Args: { p_bolao_id: string; p_celular: string }
         Returns: boolean
       }
+      is_maintenance_mode: { Args: never; Returns: Json }
       is_valid_participant_for_bolao: {
         Args: { p_bolao_id: string }
         Returns: boolean
@@ -462,6 +488,10 @@ export type Database = {
       }
       send_participant_message_by_apelido: {
         Args: { p_apelido: string; p_bolao_id: string; p_content: string }
+        Returns: Json
+      }
+      toggle_maintenance_mode: {
+        Args: { p_enabled: boolean; p_message?: string }
         Returns: Json
       }
       update_participant_message: {

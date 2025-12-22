@@ -3,11 +3,13 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { ClosedBolaoMessage } from "@/components/bolao/ClosedBolaoMessage";
 import { BetForm } from "@/components/bolao/BetForm";
 import { MessagesPanel } from "@/components/bolao/MessagesPanel";
+import { MaintenanceScreen } from "@/components/layout/MaintenanceScreen";
 import { Footer } from "@/components/layout/Footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useParticipantAuth } from "@/hooks/useParticipantAuth";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { Loader2, Users, ArrowLeft, LogIn, LogOut, User, Clock, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { format, isPast, formatDistanceToNow } from "date-fns";
@@ -31,6 +33,7 @@ export default function Participar() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { session, isLoading: authLoading, logout, login } = useParticipantAuth(id);
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading, refreshStatus } = useMaintenanceMode();
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [paymentInfo, setPaymentInfo] = useState<{ chave_pix: string; valor_cota: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -124,12 +127,17 @@ export default function Participar() {
     toast.success("Logout realizado com sucesso!");
   };
 
-  if (loading || authLoading) {
+  if (loading || authLoading || maintenanceLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // Show maintenance screen for public users
+  if (isMaintenanceMode) {
+    return <MaintenanceScreen message={maintenanceMessage} onRefresh={refreshStatus} />;
   }
 
   if (!bolao) {
