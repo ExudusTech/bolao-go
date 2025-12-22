@@ -4,7 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Check, FileImage, Loader2 } from "lucide-react";
+import { Check, FileImage, Loader2, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface Bet {
   id: string;
@@ -23,6 +34,7 @@ interface BetsTableProps {
 
 export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleMarkPaid = async (betId: string) => {
     setUpdatingId(betId);
@@ -48,6 +60,25 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
     setUpdatingId(null);
   };
 
+  const handleDeleteBet = async (betId: string, apelido: string) => {
+    setDeletingId(betId);
+    
+    const { error } = await supabase
+      .from("apostas")
+      .delete()
+      .eq("id", betId);
+
+    if (error) {
+      console.error("Error deleting bet:", error);
+      toast.error("Erro ao excluir aposta");
+    } else {
+      toast.success(`Aposta de "${apelido}" excluída`);
+      onPaymentUpdate?.();
+    }
+    
+    setDeletingId(null);
+  };
+
   if (bets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -67,6 +98,7 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
             <TableHead className="font-semibold">Dezenas</TableHead>
             <TableHead className="font-semibold">Pagamento</TableHead>
             <TableHead className="font-semibold text-right">Data/Hora</TableHead>
+            <TableHead className="font-semibold w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -135,6 +167,42 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
+              </TableCell>
+              <TableCell>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={deletingId === bet.id}
+                      className="h-8 w-8 p-0"
+                    >
+                      {deletingId === bet.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Excluir aposta?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Tem certeza que deseja excluir a aposta de "{bet.apelido}"?
+                        Esta ação não pode ser desfeita.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => handleDeleteBet(bet.id, bet.apelido)}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Excluir
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </TableCell>
             </TableRow>
           ))}
