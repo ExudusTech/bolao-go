@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { apostasSchema, ApostaInput } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, Check, Share2, Upload, FileImage, Plus, Eye, EyeOff } from "lucide-react";
+import { Loader2, Check, Share2, Upload, FileImage, Plus, Eye, EyeOff, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BetFormProps {
@@ -377,10 +377,25 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                 <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
                   💳 Informações de Pagamento
                 </h4>
-                <p className="text-sm text-foreground">
-                  <span className="text-muted-foreground">Chave PIX:</span>{" "}
-                  <span className="font-mono font-medium">{chavePix}</span>
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-foreground flex-1">
+                    <span className="text-muted-foreground">Chave PIX:</span>{" "}
+                    <span className="font-mono font-medium break-all">{chavePix}</span>
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(chavePix);
+                      toast.success("Chave PIX copiada!");
+                    }}
+                    className="h-8 px-3 shrink-0"
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copiar
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground mt-2">
                   Faça o pagamento e envie o comprovante para cada aposta.
                 </p>
