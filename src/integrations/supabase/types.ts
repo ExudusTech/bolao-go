@@ -295,6 +295,53 @@ export type Database = {
         }
         Relationships: []
       }
+      session_logs: {
+        Row: {
+          action: string
+          apelido: string
+          bolao_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          ip_hint: string | null
+          session_id: string | null
+          success: boolean
+          user_agent_hint: string | null
+        }
+        Insert: {
+          action: string
+          apelido: string
+          bolao_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_hint?: string | null
+          session_id?: string | null
+          success?: boolean
+          user_agent_hint?: string | null
+        }
+        Update: {
+          action?: string
+          apelido?: string
+          bolao_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_hint?: string | null
+          session_id?: string | null
+          success?: boolean
+          user_agent_hint?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_logs_bolao_id_fkey"
+            columns: ["bolao_id"]
+            isOneToOne: false
+            referencedRelation: "boloes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -368,6 +415,14 @@ export type Database = {
         Returns: Json
       }
       get_participant_apostas: { Args: { p_apelido: string }; Returns: Json }
+      get_session_logs: {
+        Args: { p_bolao_id: string; p_limit?: number }
+        Returns: Json
+      }
+      get_suspicious_activity: {
+        Args: { p_bolao_id: string; p_hours?: number }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -383,6 +438,17 @@ export type Database = {
       is_valid_participant_for_bolao: {
         Args: { p_bolao_id: string }
         Returns: boolean
+      }
+      log_session_activity: {
+        Args: {
+          p_action: string
+          p_apelido: string
+          p_bolao_id: string
+          p_error_message?: string
+          p_session_id: string
+          p_success?: boolean
+        }
+        Returns: undefined
       }
       participant_login: {
         Args: { p_apelido: string; p_bolao_id: string; p_senha: string }
