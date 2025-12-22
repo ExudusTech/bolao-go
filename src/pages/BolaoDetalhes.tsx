@@ -91,6 +91,8 @@ export default function BolaoDetalhes() {
   const [togglingEncerrado, setTogglingEncerrado] = useState(false);
 
   const [updatingDeadline, setUpdatingDeadline] = useState(false);
+  const [showPaidOnlyGrid, setShowPaidOnlyGrid] = useState(true);
+
 
   const fetchData = useCallback(async () => {
     if (!id) return;
@@ -711,13 +713,41 @@ export default function BolaoDetalhes() {
             {apostas.length > 0 && (
               <CollapsibleSection
                 title="Mapa de Números Escolhidos"
-                description={`Visualização de todos os ${apostas.length} números apostados`}
+                description={`Visualização dos números apostados`}
                 icon={<Grid3X3 className="h-5 w-5" />}
                 variant="accent"
                 defaultOpen={true}
+                headerExtra={
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={showPaidOnlyGrid ? "default" : "outline"}
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPaidOnlyGrid(true);
+                      }}
+                      className="h-7 text-xs"
+                    >
+                      <DollarSign className="h-3 w-3 mr-1" />
+                      Pagas ({paidApostas.length})
+                    </Button>
+                    <Button
+                      variant={!showPaidOnlyGrid ? "default" : "outline"}
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowPaidOnlyGrid(false);
+                      }}
+                      className="h-7 text-xs"
+                    >
+                      <Users className="h-3 w-3 mr-1" />
+                      Todas ({apostas.length})
+                    </Button>
+                  </div>
+                }
               >
                 <NumbersGrid 
-                  apostas={apostas.map(a => ({ dezenas: a.dezenas }))}
+                  apostas={(showPaidOnlyGrid ? paidApostas : apostas).map(a => ({ dezenas: a.dezenas }))}
                   maxNumber={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.numberRange || 60}
                   showCounts={true}
                 />

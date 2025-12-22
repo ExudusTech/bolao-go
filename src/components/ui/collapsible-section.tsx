@@ -13,6 +13,7 @@ interface CollapsibleSectionProps {
   className?: string;
   headerClassName?: string;
   badge?: ReactNode;
+  headerExtra?: ReactNode;
   variant?: "default" | "success" | "accent" | "primary";
 }
 
@@ -25,6 +26,7 @@ export function CollapsibleSection({
   className,
   headerClassName,
   badge,
+  headerExtra,
   variant = "default",
 }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -65,6 +67,7 @@ export function CollapsibleSection({
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {headerExtra}
             {badge}
             <Button
               variant="ghost"
