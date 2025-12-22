@@ -287,46 +287,96 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
     }
   }, [showOthersNumbers, othersNumberCounts, loadingOthers, bolaoId]);
 
-  // Number grid sub-component with highlight support
+  // Calculate max count for gradient intensity
+  const maxCount = useMemo(() => {
+    if (!showOthersNumbers || Object.keys(othersNumberCounts).length === 0) return 1;
+    return Math.max(...Object.values(othersNumberCounts), 1);
+  }, [showOthersNumbers, othersNumberCounts]);
+
+  // Get gradient color based on popularity
+  const getNumberGradientStyle = (num: number, isSelected: boolean): string => {
+    if (isSelected) {
+      return "bg-success text-success-foreground shadow-md ring-2 ring-success/30";
+    }
+
+    if (!showOthersNumbers) {
+      return "bg-muted hover:bg-success/20 text-foreground";
+    }
+
+    const count = othersNumberCounts[num] || 0;
+    
+    if (count === 0) {
+      return "bg-muted hover:bg-success/20 text-muted-foreground";
+    }
+    
+    // Calculate intensity based on count relative to max
+    const intensity = count / maxCount;
+    
+    if (intensity > 0.7) {
+      return "bg-orange-600 text-white hover:bg-orange-700";
+    } else if (intensity > 0.4) {
+      return "bg-orange-500/70 text-white hover:bg-orange-600";
+    } else {
+      return "bg-orange-400/50 text-foreground hover:bg-orange-500/60";
+    }
+  };
+
+  // Number grid sub-component with gradient highlight support
   const NumberGridWithHighlight = ({ 
     numbers: gridNumbers, 
     selectedNumbers: gridSelected, 
-    othersChosen, 
-    showHighlight, 
     onNumberClick: gridClick, 
     disabled: gridDisabled 
   }: {
     numbers: number[];
     selectedNumbers: number[];
-    othersChosen: Record<number, number>;
-    showHighlight: boolean;
     onNumberClick: (num: number) => void;
     disabled: boolean;
   }) => (
-    <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
-      {gridNumbers.map((num) => {
-        const isSelected = gridSelected.includes(num);
-        const isChosenByOthers = showHighlight && othersChosen[num] > 0;
-        return (
-          <button
-            key={num}
-            type="button"
-            onClick={() => gridClick(num)}
-            disabled={gridDisabled}
-            className={cn(
-              "flex h-8 w-full items-center justify-center rounded-full text-sm font-medium transition-all duration-150",
-              "hover:scale-105 active:scale-95",
-              isSelected
-                ? "bg-success text-success-foreground shadow-md ring-2 ring-success/30"
-                : isChosenByOthers
-                  ? "bg-orange-500/80 text-white hover:bg-orange-500"
-                  : "bg-muted hover:bg-success/20 text-foreground"
-            )}
-          >
-            {num.toString().padStart(2, "0")}
-          </button>
-        );
-      })}
+    <div className="space-y-3">
+      <div className="grid grid-cols-10 gap-1.5 sm:gap-2">
+        {gridNumbers.map((num) => {
+          const isSelected = gridSelected.includes(num);
+          return (
+            <button
+              key={num}
+              type="button"
+              onClick={() => gridClick(num)}
+              disabled={gridDisabled}
+              title={showOthersNumbers && othersNumberCounts[num] ? `${num}: ${othersNumberCounts[num]} votos` : undefined}
+              className={cn(
+                "flex h-8 w-full items-center justify-center rounded-full text-sm font-medium transition-all duration-150",
+                "hover:scale-105 active:scale-95",
+                getNumberGradientStyle(num, isSelected)
+              )}
+            >
+              {num.toString().padStart(2, "0")}
+            </button>
+          );
+        })}
+      </div>
+      
+      {/* Legend - only show when highlighting is active */}
+      {showOthersNumbers && (
+        <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-muted-foreground pt-2">
+          <div className="flex items-center gap-1.5">
+            <div className="h-4 w-4 rounded-full bg-muted" />
+            <span>Não votado</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-4 w-4 rounded-full bg-orange-400/50" />
+            <span>Poucos</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-4 w-4 rounded-full bg-orange-500/70" />
+            <span>Médio</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="h-4 w-4 rounded-full bg-orange-600" />
+            <span>Mais votado</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -616,18 +666,11 @@ export function BetForm({ bolaoId, bolaoNome, chavePix, observacoes, valorCota, 
                 )}
               </div>
 
-              {showOthersNumbers && (
-                <p className="text-xs text-muted-foreground text-center bg-warning/10 text-warning-foreground px-2 py-1 rounded">
-                  🟠 Números em laranja já foram escolhidos por outros participantes
-                </p>
-              )}
 
               {/* Number Grid */}
               <NumberGridWithHighlight
                 numbers={numbers}
                 selectedNumbers={selectedNumbers}
-                othersChosen={othersNumberCounts}
-                showHighlight={showOthersNumbers}
                 onNumberClick={handleNumberClick}
                 disabled={isLoading}
               />
