@@ -646,7 +646,7 @@ export default function BolaoDetalhes() {
                       </p>
                     </div>
                     <div className="text-left sm:text-right">
-                      <p className="text-xl sm:text-2xl font-bold text-success">R$ {totalArrecadado.toFixed(2)}</p>
+                      <p className="text-xl sm:text-2xl font-bold text-success">{totalArrecadado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
                       <p className="text-xs text-muted-foreground">Total arrecadado</p>
                     </div>
                   </div>
@@ -824,6 +824,7 @@ export default function BolaoDetalhes() {
                   registrado: a.registrado,
                   data_registro: a.data_registro
                 }))}
+                valorCota={bolao.valor_cota}
                 onBetRegistrationChange={fetchData}
               />
             </CollapsibleSection>

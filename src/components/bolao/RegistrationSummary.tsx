@@ -31,10 +31,15 @@ interface RegistrationSummaryProps {
   bolaoId: string;
   lotteryName: string;
   paidBets: IndividualBet[];
+  valorCota: number;
   onBetRegistrationChange?: () => void;
 }
 
-export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegistrationChange }: RegistrationSummaryProps) {
+const formatCurrency = (value: number) => {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
+export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota, onBetRegistrationChange }: RegistrationSummaryProps) {
   const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -162,7 +167,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
   const totalGamesCount = savedGames.length + paidBets.length;
   const allRegistered = totalRegisteredCount === totalGamesCount;
   const totalGamesCost = savedGames.reduce((sum, g) => sum + g.custo, 0);
-  const individualCost = paidBets.length * 5.00;
+  const individualCost = paidBets.length * valorCota;
   const totalCost = totalGamesCost + individualCost;
 
   const generateSummaryText = () => {
@@ -171,7 +176,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
       `Loteria: ${lotteryName}`,
       `Total de Jogos: ${totalGamesCount}`,
-      `Valor Total: R$ ${totalCost.toFixed(2)}`,
+      `Valor Total: ${formatCurrency(totalCost)}`,
       ``,
     ];
 
@@ -182,7 +187,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
         const nums = game.dezenas.map(n => n.toString().padStart(2, "0")).join(" - ");
         const status = game.registrado ? "✅ Registrado" : "⏳ Pendente";
         lines.push(`Jogo ${index + 1} (${game.tipo}): ${nums}`);
-        lines.push(`   Valor: R$ ${game.custo.toFixed(2)} | ${status}`);
+        lines.push(`   Valor: ${formatCurrency(game.custo)} | ${status}`);
         lines.push(``);
       });
     }
@@ -240,7 +245,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
         </div>
         <div className="p-3 rounded-lg bg-success/10 border border-success/30 text-center">
           <p className="text-xs text-muted-foreground">Valor Total</p>
-          <p className="text-sm sm:text-lg font-bold text-success">R$ {totalCost.toFixed(2)}</p>
+          <p className="text-sm sm:text-lg font-bold text-success">{formatCurrency(totalCost)}</p>
         </div>
         <div className="p-3 rounded-lg bg-primary/10 border border-primary/30 text-center">
           <p className="text-xs text-muted-foreground">Registrados</p>
@@ -283,7 +288,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, onBetRegis
                     </div>
                   </div>
                   <div className="text-left sm:text-right ml-8 sm:ml-0">
-                    <span className="text-sm font-medium">R$ {game.custo.toFixed(2)}</span>
+                    <span className="text-sm font-medium">{formatCurrency(game.custo)}</span>
                     {game.registrado && game.data_registro && (
                       <p className="text-xs text-muted-foreground">
                         {format(new Date(game.data_registro), "dd/MM 'às' HH:mm", { locale: ptBR })}
