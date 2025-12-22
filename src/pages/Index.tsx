@@ -4,7 +4,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/useAuth";
-import { ArrowRight, Link2, Users, Download, Shield, Zap, BarChart3, User } from "lucide-react";
+import { ArrowRight, Link2, Users, Download, Shield, Zap, BarChart3, User, Settings } from "lucide-react";
 
 export default function Index() {
   const { user } = useAuth();
@@ -137,6 +137,20 @@ export default function Index() {
                 </Link>
               </Button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Admin Access Section */}
+      <section className="border-t bg-card/50">
+        <div className="container py-6 px-4">
+          <div className="mx-auto max-w-2xl text-center">
+            <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+              <Link to="/admin/login">
+                <Settings className="h-4 w-4 mr-2" />
+                Painel Administrativo
+              </Link>
+            </Button>
           </div>
         </div>
       </section>
