@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Check, FileImage, Loader2, Trash2 } from "lucide-react";
+import { Check, FileImage, Loader2, Trash2, Undo2 } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +16,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Bet {
   id: string;
@@ -27,6 +34,8 @@ interface Bet {
   receipt_url: string | null;
 }
 
+type PaymentFilter = "all" | "paid" | "pending";
+
 interface BetsTableProps {
   bets: Bet[];
   onPaymentUpdate?: () => void;
@@ -35,6 +44,14 @@ interface BetsTableProps {
 export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+
+  const filteredBets = bets.filter((bet) => {
+    if (paymentFilter === "all") return true;
+    if (paymentFilter === "paid") return bet.payment_status === "paid";
+    if (paymentFilter === "pending") return bet.payment_status === "pending";
+    return true;
+  });
 
   const handleMarkPaid = async (betId: string) => {
     setUpdatingId(betId);
@@ -54,6 +71,28 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
       toast.error("Erro ao marcar como pago");
     } else {
       toast.success("Pagamento confirmado!");
+      onPaymentUpdate?.();
+    }
+    
+    setUpdatingId(null);
+  };
+
+  const handleRevertPayment = async (betId: string) => {
+    setUpdatingId(betId);
+    
+    const { error } = await supabase
+      .from("apostas")
+      .update({ 
+        payment_status: "pending", 
+        paid_at: null,
+        paid_marked_by: null 
+      })
+      .eq("id", betId);
+
+    if (error) {
+      toast.error("Erro ao reverter pagamento");
+    } else {
+      toast.success("Pagamento revertido para pendente");
       onPaymentUpdate?.();
     }
     
@@ -88,8 +127,30 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
     );
   }
 
+  const paidCount = bets.filter(b => b.payment_status === "paid").length;
+  const pendingCount = bets.filter(b => b.payment_status === "pending").length;
+
   return (
-    <div className="rounded-lg border overflow-hidden">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filtrar:</span>
+          <Select value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as PaymentFilter)}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos ({bets.length})</SelectItem>
+              <SelectItem value="paid">Pagos ({paidCount})</SelectItem>
+              <SelectItem value="pending">Pendentes ({pendingCount})</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <span className="text-sm text-muted-foreground">
+          Exibindo {filteredBets.length} de {bets.length} apostas
+        </span>
+      </div>
+      <div className="rounded-lg border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
@@ -102,7 +163,7 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {bets.map((bet, index) => (
+          {filteredBets.map((bet, index) => (
             <TableRow 
               key={bet.id}
               className="stagger-item"
@@ -127,10 +188,26 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
               <TableCell>
                 <div className="flex items-center gap-2">
                   {bet.payment_status === "paid" ? (
-                    <Badge className="bg-success text-success-foreground">
-                      <Check className="h-3 w-3 mr-1" />
-                      Pago
-                    </Badge>
+                    <>
+                      <Badge className="bg-success text-success-foreground">
+                        <Check className="h-3 w-3 mr-1" />
+                        Pago
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRevertPayment(bet.id)}
+                        disabled={updatingId === bet.id}
+                        className="h-7 w-7 p-0"
+                        title="Reverter para pendente"
+                      >
+                        {updatingId === bet.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Undo2 className="h-3 w-3 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </>
                   ) : (
                     <Button
                       size="sm"
@@ -207,7 +284,8 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
   );
 }
