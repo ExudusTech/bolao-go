@@ -95,16 +95,25 @@ export default function ParticipanteDashboard() {
     
     setLoadingBoloes(true);
     
-    // Get all apostas for this apelido (case insensitive)
-    const { data: apostasData, error: apostasError } = await supabase
-      .from("apostas")
-      .select("id, bolao_id, dezenas, created_at, apelido")
-      .ilike("apelido", session.apelido);
+    // Use RPC function to get apostas (bypasses RLS)
+    const { data: rpcResult, error: apostasError } = await supabase.rpc("get_participant_apostas", {
+      p_apelido: session.apelido
+    });
     
-    if (apostasError || !apostasData || apostasData.length === 0) {
+    if (apostasError) {
+      console.error("Error fetching apostas:", apostasError);
       setLoadingBoloes(false);
       return;
     }
+
+    const result = rpcResult as { success: boolean; apostas?: Array<{ id: string; bolao_id: string; dezenas: number[]; created_at: string; apelido: string }> };
+    
+    if (!result.success || !result.apostas || result.apostas.length === 0) {
+      setLoadingBoloes(false);
+      return;
+    }
+
+    const apostasData = result.apostas;
 
     // Get unique bolao IDs
     const bolaoIds = [...new Set(apostasData.map(a => a.bolao_id))];
