@@ -5,6 +5,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { useParticipantAuth } from "@/hooks/useParticipantAuth";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
+import { MaintenanceScreen } from "@/components/layout/MaintenanceScreen";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +32,7 @@ export default function ParticipantLogin() {
   const { id: bolaoId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { session, isLoading: authLoading, login } = useParticipantAuth(bolaoId);
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading, refreshStatus } = useMaintenanceMode();
   const [bolao, setBolao] = useState<BolaoInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -86,12 +89,16 @@ export default function ParticipantLogin() {
     }
   }
 
-  if (loading || authLoading) {
+  if (loading || authLoading || maintenanceLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (isMaintenanceMode) {
+    return <MaintenanceScreen message={maintenanceMessage} onRefresh={refreshStatus} />;
   }
 
   if (!bolao) {

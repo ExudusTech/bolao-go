@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Footer } from "@/components/layout/Footer";
+import { MaintenanceScreen } from "@/components/layout/MaintenanceScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { toast } from "sonner";
 import { Loader2, LogOut, Users, Calendar, ChevronRight, User, Clock, Trophy, Grid3X3, BarChart3 } from "lucide-react";
 import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
@@ -53,6 +55,7 @@ const STORAGE_KEY = "participant_global_session";
 
 export default function ParticipanteDashboard() {
   const navigate = useNavigate();
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading, refreshStatus } = useMaintenanceMode();
   const [session, setSession] = useState<ParticipantSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -212,12 +215,17 @@ export default function ParticipanteDashboard() {
     setLoadingDetalhes(false);
   };
 
-  if (isLoading) {
+  if (isLoading || maintenanceLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  // Show maintenance screen
+  if (isMaintenanceMode) {
+    return <MaintenanceScreen message={maintenanceMessage} onRefresh={refreshStatus} />;
   }
 
   // Login screen
