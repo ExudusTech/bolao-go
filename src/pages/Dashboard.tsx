@@ -51,19 +51,11 @@ export default function Dashboard() {
         <main className="container py-8 px-4 flex-1">
           <div className="flex flex-col gap-6">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Seus Bolões</h1>
-                <p className="text-muted-foreground">
-                  Gerencie seus bolões e acompanhe as apostas
-                </p>
-              </div>
-              <Button asChild className="hover-scale">
-                <Link to="/bolao/criar">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Criar Novo Bolão
-                </Link>
-              </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Seus Bolões</h1>
+              <p className="text-muted-foreground">
+                Gerencie seus bolões e acompanhe as apostas
+              </p>
             </div>
 
             {/* Content */}
@@ -77,15 +69,9 @@ export default function Dashboard() {
                   <FolderOpen className="h-8 w-8 text-muted-foreground" />
                 </div>
                 <h2 className="text-lg font-semibold">Nenhum bolão criado</h2>
-                <p className="text-muted-foreground mb-4">
-                  Crie seu primeiro bolão e comece a receber apostas
+                <p className="text-muted-foreground">
+                  Crie seu primeiro bolão clicando em "Novo Bolão" no menu acima
                 </p>
-                <Button asChild>
-                  <Link to="/bolao/criar">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Criar Bolão
-                  </Link>
-                </Button>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
