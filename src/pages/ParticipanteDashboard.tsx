@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/button";
@@ -8,10 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, LogOut, Users, Calendar, ChevronRight, Eye, User, Clock, Trophy, MessageCircle } from "lucide-react";
+import { Loader2, LogOut, Users, Calendar, ChevronRight, Eye, User, Clock, Trophy } from "lucide-react";
 import { getBolaoStatus, getStatusBadgeClasses } from "@/lib/bolao-status";
 import { cn } from "@/lib/utils";
-import { MessagesPanel } from "@/components/bolao/MessagesPanel";
+import { ParticipantMessagesPanel } from "@/components/bolao/ParticipantMessagesPanel";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CollapsibleSection } from "@/components/ui/collapsible-section";
@@ -59,7 +59,6 @@ export default function ParticipanteDashboard() {
   const [selectedBolao, setSelectedBolao] = useState<BolaoParticipacao | null>(null);
   const [allApostadores, setAllApostadores] = useState<Apostador[]>([]);
   const [loadingDetalhes, setLoadingDetalhes] = useState(false);
-  const [participantToken, setParticipantToken] = useState<string | null>(null);
 
   // Login form state
   const [apelido, setApelido] = useState("");
@@ -200,12 +199,6 @@ export default function ParticipanteDashboard() {
       if (result.success && result.apostas) {
         setAllApostadores(result.apostas);
       }
-    }
-    
-    // Try to get participant token for messages
-    // We use the same login to validate
-    if (session) {
-      setParticipantToken(session.token);
     }
     
     setLoadingDetalhes(false);
@@ -489,12 +482,12 @@ export default function ParticipanteDashboard() {
           </CollapsibleSection>
 
           {/* Mensagens */}
-          <MessagesPanel
-            bolaoId={selectedBolao.id}
-            isGestor={false}
-            participantToken={participantToken || undefined}
-            participantApelido={session?.apelido}
-          />
+          {session && (
+            <ParticipantMessagesPanel
+              bolaoId={selectedBolao.id}
+              participantApelido={session.apelido}
+            />
+          )}
         </main>
         <Footer />
       </div>
