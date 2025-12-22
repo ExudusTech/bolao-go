@@ -278,7 +278,7 @@ export default function AdminDashboard() {
             </div>
           ) : (
             <>
-              {/* Maintenance Mode Toggle */}
+              {/* Maintenance Mode Toggle - Only visible in admin dashboard */}
               <div className="mb-8">
                 <MaintenanceToggle />
               </div>

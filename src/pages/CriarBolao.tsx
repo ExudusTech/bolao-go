@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
+import { MaintenanceScreen } from "@/components/layout/MaintenanceScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ import {
 import { createBolaoSchema, CreateBolaoInput, LOTTERY_TYPES } from "@/lib/validations";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { toast } from "sonner";
 import { Loader2, Copy, Check, ArrowLeft, CalendarIcon, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -36,6 +38,7 @@ import { cn } from "@/lib/utils";
 
 export default function CriarBolao() {
   const { user } = useAuth();
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading, refreshStatus } = useMaintenanceMode();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [createdBolao, setCreatedBolao] = useState<{ id: string; link: string } | null>(null);
@@ -116,6 +119,15 @@ export default function CriarBolao() {
       toast.error("Erro ao copiar link");
     }
   };
+
+  // Show maintenance screen for managers
+  if (isMaintenanceMode && !maintenanceLoading) {
+    return (
+      <AuthGuard>
+        <MaintenanceScreen message={maintenanceMessage} onRefresh={refreshStatus} />
+      </AuthGuard>
+    );
+  }
 
   return (
     <AuthGuard>

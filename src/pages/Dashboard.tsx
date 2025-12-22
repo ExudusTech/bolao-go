@@ -2,9 +2,11 @@ import { useEffect, useState, useMemo } from "react";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { AuthGuard } from "@/components/layout/AuthGuard";
+import { MaintenanceScreen } from "@/components/layout/MaintenanceScreen";
 import { BolaoCard } from "@/components/bolao/BolaoCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useMaintenanceMode } from "@/hooks/useMaintenanceMode";
 import { Loader2, FolderOpen } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -23,6 +25,7 @@ type FilterType = "todos" | "ativos" | "encerrados" | "com_resultado";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { isMaintenanceMode, maintenanceMessage, isLoading: maintenanceLoading, refreshStatus } = useMaintenanceMode();
   const [boloes, setBoloes] = useState<Bolao[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterType>("todos");
@@ -65,6 +68,15 @@ export default function Dashboard() {
     }
     setLoading(false);
   };
+
+  // Show maintenance screen for managers (not admins)
+  if (isMaintenanceMode && !maintenanceLoading) {
+    return (
+      <AuthGuard>
+        <MaintenanceScreen message={maintenanceMessage} onRefresh={refreshStatus} />
+      </AuthGuard>
+    );
+  }
 
   return (
     <AuthGuard>
