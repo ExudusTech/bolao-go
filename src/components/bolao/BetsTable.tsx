@@ -2,9 +2,10 @@ import { useState } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Check, FileImage, Loader2, Trash2, Undo2 } from "lucide-react";
+import { Check, FileImage, Loader2, Trash2, Undo2, Pencil, Save, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,6 +17,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -45,6 +54,9 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>("all");
+  const [editingBet, setEditingBet] = useState<Bet | null>(null);
+  const [editApelido, setEditApelido] = useState("");
+  const [savingApelido, setSavingApelido] = useState(false);
 
   const filteredBets = bets.filter((bet) => {
     if (paymentFilter === "all") return true;
@@ -118,6 +130,38 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
     setDeletingId(null);
   };
 
+  const handleEditApelido = (bet: Bet) => {
+    setEditingBet(bet);
+    setEditApelido(bet.apelido);
+  };
+
+  const handleSaveApelido = async () => {
+    if (!editingBet || !editApelido.trim()) return;
+    
+    if (editApelido.trim() === editingBet.apelido) {
+      setEditingBet(null);
+      return;
+    }
+    
+    setSavingApelido(true);
+    
+    const { error } = await supabase
+      .from("apostas")
+      .update({ apelido: editApelido.trim() })
+      .eq("id", editingBet.id);
+    
+    if (error) {
+      console.error("Error updating apelido:", error);
+      toast.error("Erro ao atualizar apelido");
+    } else {
+      toast.success(`Apelido alterado para "${editApelido.trim()}"`);
+      onPaymentUpdate?.();
+    }
+    
+    setSavingApelido(false);
+    setEditingBet(null);
+  };
+
   if (bets.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -169,7 +213,20 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
               className="stagger-item"
               style={{ animationDelay: `${index * 40}ms` }}
             >
-              <TableCell className="font-medium">{bet.apelido}</TableCell>
+              <TableCell className="font-medium">
+                <div className="flex items-center gap-1">
+                  <span className="truncate max-w-[150px]" title={bet.apelido}>{bet.apelido}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEditApelido(bet)}
+                    className="h-6 w-6 p-0 opacity-50 hover:opacity-100"
+                    title="Editar apelido"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </div>
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 ****-****-{bet.celular.slice(-4)}
               </TableCell>
@@ -286,6 +343,51 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
         </TableBody>
         </Table>
       </div>
+
+      {/* Edit Apelido Dialog */}
+      <Dialog open={!!editingBet} onOpenChange={(open) => !open && setEditingBet(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Apelido</DialogTitle>
+            <DialogDescription>
+              Altere o apelido do participante
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              value={editApelido}
+              onChange={(e) => setEditApelido(e.target.value)}
+              placeholder="Novo apelido"
+              maxLength={50}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !savingApelido) {
+                  handleSaveApelido();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setEditingBet(null)}
+              disabled={savingApelido}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveApelido}
+              disabled={savingApelido || !editApelido.trim()}
+            >
+              {savingApelido ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
