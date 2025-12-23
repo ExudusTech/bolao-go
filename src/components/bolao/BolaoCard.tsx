@@ -6,6 +6,7 @@ import { Calendar, Users, ExternalLink, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { getBolaoStatus } from "@/lib/bolao-status";
 import { BolaoProgressBar } from "./BolaoProgressBar";
+import { QRCodeDisplay } from "./QRCodeDisplay";
 
 interface BolaoCardProps {
   id: string;
@@ -90,6 +91,7 @@ export function BolaoCard({
             <Copy className="h-3.5 w-3.5 mr-1.5" />
             Copiar Link
           </Button>
+          <QRCodeDisplay url={publicLink} />
           <Button size="sm" className="flex-1 hover-scale" asChild>
             <Link to={`/gestor/bolao/${id}`}>
               <ExternalLink className="h-3.5 w-3.5 mr-1.5" />

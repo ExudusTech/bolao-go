@@ -35,6 +35,7 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { QRCodeDisplay } from "@/components/bolao/QRCodeDisplay";
 
 export default function CriarBolao() {
   const { user } = useAuth();
@@ -397,6 +398,10 @@ export default function CriarBolao() {
                         )}
                       </Button>
                     </div>
+                  </div>
+
+                  <div className="flex justify-center py-2">
+                    <QRCodeDisplay url={createdBolao.link} showButton={false} size="lg" />
                   </div>
 
                   <div className="flex flex-col gap-2 pt-4">
