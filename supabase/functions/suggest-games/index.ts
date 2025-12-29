@@ -409,12 +409,16 @@ function generateCustomGame(
       const available = analysis.notVoted
         .filter(n => !usedNumbersInCriteria.has(n));
       
-      // Shuffle for variation
-      const shuffled = [...available].sort(() => Math.random() - 0.5);
+      // Shuffle for variation using Fisher-Yates
+      const shuffled = [...available];
+      for (let j = shuffled.length - 1; j > 0; j--) {
+        const randIndex = Math.floor(Math.random() * (j + 1));
+        [shuffled[j], shuffled[randIndex]] = [shuffled[randIndex], shuffled[j]];
+      }
       
       if (shuffled.length >= size) {
         numbers = shuffled.slice(0, size);
-        reason = `Jogo personalizado com ${size} números NÃO VOTADOS`;
+        reason = `Jogo personalizado com ${size} números NÃO VOTADOS (selecionados aleatoriamente)`;
       }
     } else if (criteria === 'misto') {
       const halfSize = Math.ceil(size / 2);
@@ -446,6 +450,16 @@ function generateCustomGame(
   }
   
   return null;
+}
+
+// Helper function to shuffle an array using Fisher-Yates algorithm
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const randIndex = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[randIndex]] = [shuffled[randIndex], shuffled[i]];
+  }
+  return shuffled;
 }
 
 serve(async (req) => {
@@ -666,36 +680,68 @@ serve(async (req) => {
           let reason = '';
           
           if (criteria === 'mais_votados') {
-            // For "mais_votados", ALWAYS use the TOP N numbers from the ranking
-            // This means a 10-number game uses positions 1-10, a 9-number game uses positions 1-9, etc.
-            const topNumbers = rankedMostVoted
-              .slice(0, size)
-              .map(e => e.number);
+            // For "mais_votados", use TOP N numbers but RANDOMIZE when there are ties
+            // Group numbers by vote count
+            const voteGroups = new Map<number, number[]>();
+            rankedMostVoted.forEach(e => {
+              if (!voteGroups.has(e.count)) voteGroups.set(e.count, []);
+              voteGroups.get(e.count)!.push(e.number);
+            });
             
-            if (topNumbers.length >= size) {
-              numbers = topNumbers;
-              reason = `Jogo com ${size} números MAIS VOTADOS (TOP ${size} do ranking: posições 1º ao ${size}º)`;
-              console.log(`mais_votados game ${size} dezenas: using TOP ${size} numbers: ${numbers.join(', ')}`);
+            // Sort vote counts descending
+            const sortedCounts = [...voteGroups.keys()].sort((a, b) => b - a);
+            
+            // Build selection, randomizing within each tie group
+            const selectedNumbers: number[] = [];
+            for (const count of sortedCounts) {
+              if (selectedNumbers.length >= size) break;
+              const group = shuffleArray(voteGroups.get(count)!);
+              const needed = size - selectedNumbers.length;
+              selectedNumbers.push(...group.slice(0, needed));
+            }
+            
+            if (selectedNumbers.length >= size) {
+              numbers = selectedNumbers.slice(0, size);
+              reason = `Jogo com ${size} números MAIS VOTADOS (TOP ${size} do ranking, aleatorizado em empates)`;
+              console.log(`mais_votados game ${size} dezenas: ${numbers.join(', ')} (randomized ties)`);
             }
           } else if (criteria === 'menos_votados') {
-            // For "menos_votados", use the TOP N from the least voted ranking
-            const leastNumbers = rankedLeastVoted
-              .slice(0, size)
-              .map(e => e.number);
+            // For "menos_votados", use TOP N from least voted, RANDOMIZE when there are ties
+            // Group numbers by vote count
+            const voteGroups = new Map<number, number[]>();
+            rankedLeastVoted.forEach(e => {
+              if (!voteGroups.has(e.count)) voteGroups.set(e.count, []);
+              voteGroups.get(e.count)!.push(e.number);
+            });
             
-            if (leastNumbers.length >= size) {
-              numbers = leastNumbers;
-              reason = `Jogo com ${size} números MENOS VOTADOS (TOP ${size} menos votados: posições 1º ao ${size}º)`;
-              console.log(`menos_votados game ${size} dezenas: using TOP ${size} least voted: ${numbers.join(', ')}`);
+            // Sort vote counts ascending (least voted first)
+            const sortedCounts = [...voteGroups.keys()].sort((a, b) => a - b);
+            
+            // Build selection, randomizing within each tie group
+            const selectedNumbers: number[] = [];
+            for (const count of sortedCounts) {
+              if (selectedNumbers.length >= size) break;
+              const group = shuffleArray(voteGroups.get(count)!);
+              const needed = size - selectedNumbers.length;
+              selectedNumbers.push(...group.slice(0, needed));
+            }
+            
+            if (selectedNumbers.length >= size) {
+              numbers = selectedNumbers.slice(0, size);
+              reason = `Jogo com ${size} números MENOS VOTADOS (TOP ${size} menos votados, aleatorizado em empates)`;
+              console.log(`menos_votados game ${size} dezenas: ${numbers.join(', ')} (randomized ties)`);
             }
           } else if (criteria === 'nao_votados') {
-            // For "nao_votados", use the first N numbers that weren't voted
-            const notVotedNumbers = analysis.notVoted.slice(0, size);
+            // For "nao_votados", RANDOMLY select N numbers from the pool of not voted numbers
+            // This avoids bias (always picking the same ones) and is easier to justify to participants
+            const notVotedPool = shuffleArray(analysis.notVoted);
             
-            if (notVotedNumbers.length >= size) {
-              numbers = notVotedNumbers;
-              reason = `Jogo com ${size} números NÃO VOTADOS`;
-              console.log(`nao_votados game ${size} dezenas: ${numbers.join(', ')}`);
+            if (notVotedPool.length >= size) {
+              numbers = notVotedPool.slice(0, size);
+              reason = `Jogo com ${size} números NÃO VOTADOS (selecionados aleatoriamente dentre ${analysis.notVoted.length} disponíveis)`;
+              console.log(`nao_votados game ${size} dezenas: randomly selected ${numbers.join(', ')} from ${analysis.notVoted.length} available`);
+            } else {
+              console.log(`Could not generate nao_votados game: ${size} numbers - not enough available numbers (got ${notVotedPool.length})`);
             }
           } else if (criteria === 'misto') {
             // Mixed: half from most voted, half from least voted
