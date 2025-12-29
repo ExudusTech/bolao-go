@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Check, FileImage, Loader2, Trash2, Undo2, Pencil, Save, X } from "lucide-react";
+import { Check, FileImage, Loader2, Trash2, Undo2, Pencil, Save, X, Search } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,13 +58,29 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
   const [editingBet, setEditingBet] = useState<Bet | null>(null);
   const [editApelido, setEditApelido] = useState("");
   const [savingApelido, setSavingApelido] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredBets = bets.filter((bet) => {
-    if (paymentFilter === "all") return true;
-    if (paymentFilter === "paid") return bet.payment_status === "paid";
-    if (paymentFilter === "pending") return bet.payment_status === "pending";
-    return true;
-  });
+  // Sort by created_at ascending (oldest first) and apply filters
+  const filteredBets = useMemo(() => {
+    return bets
+      .slice()
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+      .filter((bet) => {
+        // Payment filter
+        if (paymentFilter === "paid" && bet.payment_status !== "paid") return false;
+        if (paymentFilter === "pending" && bet.payment_status !== "pending") return false;
+        
+        // Search filter (apelido or last 4 digits of phone)
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase().trim();
+          const matchesApelido = bet.apelido.toLowerCase().includes(query);
+          const matchesPhone = bet.celular.slice(-4).includes(query);
+          if (!matchesApelido && !matchesPhone) return false;
+        }
+        
+        return true;
+      });
+  }, [bets, paymentFilter, searchQuery]);
 
   const handleMarkPaid = async (betId: string) => {
     setUpdatingId(betId);
@@ -176,8 +193,8 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Filtrar:</span>
           <Select value={paymentFilter} onValueChange={(v) => setPaymentFilter(v as PaymentFilter)}>
             <SelectTrigger className="w-[180px]">
@@ -189,25 +206,34 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
               <SelectItem value="pending">Pendentes ({pendingCount})</SelectItem>
             </SelectContent>
           </Select>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar apelido ou celular..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8 w-[200px]"
+            />
+          </div>
         </div>
         <span className="text-sm text-muted-foreground">
           Exibindo {filteredBets.length} de {bets.length} apostas
         </span>
       </div>
-      <div className="rounded-lg border overflow-hidden">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            <TableHead className="font-semibold w-12 text-center">#</TableHead>
-            <TableHead className="font-semibold">Apelido</TableHead>
-            <TableHead className="font-semibold">Celular</TableHead>
-            <TableHead className="font-semibold">Dezenas</TableHead>
-            <TableHead className="font-semibold">Pagamento</TableHead>
-            <TableHead className="font-semibold text-right">Data/Hora</TableHead>
-            <TableHead className="font-semibold w-12"></TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
+      <ScrollArea className="h-[500px] rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/50">
+              <TableHead className="font-semibold w-12 text-center">#</TableHead>
+              <TableHead className="font-semibold">Apelido</TableHead>
+              <TableHead className="font-semibold">Celular</TableHead>
+              <TableHead className="font-semibold">Dezenas</TableHead>
+              <TableHead className="font-semibold">Pagamento</TableHead>
+              <TableHead className="font-semibold text-right">Data/Hora</TableHead>
+              <TableHead className="font-semibold w-12"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
           {filteredBets.map((bet, index) => (
             <TableRow 
               key={bet.id}
@@ -342,11 +368,11 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
                   </AlertDialogContent>
                 </AlertDialog>
               </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
+              </TableRow>
+            ))}
+          </TableBody>
         </Table>
-      </div>
+      </ScrollArea>
 
       {/* Edit Apelido Dialog */}
       <Dialog open={!!editingBet} onOpenChange={(open) => !open && setEditingBet(null)}>
