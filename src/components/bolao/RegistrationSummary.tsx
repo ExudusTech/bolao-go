@@ -325,7 +325,7 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
             <Ticket className="h-4 w-4 text-accent" />
             Apostas Individuais ({paidBets.length})
           </h4>
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
             {paidBets.map((bet) => (
               <div 
                 key={bet.id} 
