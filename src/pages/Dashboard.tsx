@@ -56,7 +56,41 @@ export default function Dashboard() {
     }
   }, [user]);
 
+  // Realtime subscription for apostas updates
+  useEffect(() => {
+    if (!user || boloes.length === 0) return;
+
+    const bolaoIds = boloes.map(b => b.id);
+    
+    const channel = supabase
+      .channel('dashboard-apostas-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'apostas',
+        },
+        (payload) => {
+          const bolaoId = (payload.new as { bolao_id?: string })?.bolao_id || 
+                          (payload.old as { bolao_id?: string })?.bolao_id;
+          
+          if (bolaoId && bolaoIds.includes(bolaoId)) {
+            // Refetch boloes to get updated total_apostas
+            fetchBoloes();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, boloes.length > 0]);
+
   const fetchBoloes = async () => {
+    if (!user) return;
+    
     const { data, error } = await supabase
       .from("boloes")
       .select("id, nome_do_bolao, total_apostas, created_at, encerrado, data_sorteio, numeros_sorteados, resultado_verificado")
