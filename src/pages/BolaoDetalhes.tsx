@@ -127,6 +127,44 @@ export default function BolaoDetalhes() {
     fetchData();
   }, [fetchData]);
 
+  // Realtime subscription for apostas updates
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`bolao-${id}-apostas-realtime`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'apostas',
+          filter: `bolao_id=eq.${id}`,
+        },
+        (payload) => {
+          console.log('Realtime update received:', payload.eventType);
+          
+          if (payload.eventType === 'INSERT') {
+            const newAposta = payload.new as Aposta;
+            setApostas(prev => [newAposta, ...prev]);
+            setBolao(prev => prev ? { ...prev, total_apostas: prev.total_apostas + 1 } : null);
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedAposta = payload.new as Aposta;
+            setApostas(prev => prev.map(a => a.id === updatedAposta.id ? updatedAposta : a));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedAposta = payload.old as { id: string };
+            setApostas(prev => prev.filter(a => a.id !== deletedAposta.id));
+            setBolao(prev => prev ? { ...prev, total_apostas: Math.max(0, prev.total_apostas - 1) } : null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
   const paidApostas = apostas.filter(a => a.payment_status === 'paid');
   const totalArrecadado = paidApostas.length * (bolao?.valor_cota || 0);
 
