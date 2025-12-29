@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, Loader2, Ticket, Check, CheckCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { Copy, Loader2, Ticket, Check, CheckCheck } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface SavedGame {
   id: string;
@@ -40,14 +40,10 @@ const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
-const ITEMS_PER_PAGE_OPTIONS = [5, 10, 20, 50];
-
 export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota, onBetRegistrationChange }: RegistrationSummaryProps) {
   const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchSavedGames();
@@ -175,16 +171,6 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
   const individualCost = paidBets.length * valorCota;
   const totalCost = totalGamesCost + individualCost;
 
-  // Pagination logic for individual bets
-  const totalPages = Math.ceil(paidBets.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, paidBets.length);
-  const paginatedBets = paidBets.slice(startIndex, endIndex);
-
-  // Reset to page 1 when items per page changes or bets change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [itemsPerPage, paidBets.length]);
 
   const generateSummaryText = () => {
     const lines = [
@@ -337,110 +323,63 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
       {/* Individual Bets Section */}
       {paidBets.length > 0 && (
         <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <Ticket className="h-4 w-4 text-accent" />
-              Apostas Individuais ({paidBets.length})
-            </h4>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
-                Exibindo {startIndex + 1}-{endIndex} de {paidBets.length}
-              </span>
-              <Select
-                value={itemsPerPage.toString()}
-                onValueChange={(value) => setItemsPerPage(Number(value))}
-              >
-                <SelectTrigger className="h-8 w-[70px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ITEMS_PER_PAGE_OPTIONS.map((option) => (
-                    <SelectItem key={option} value={option.toString()}>
-                      {option}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <h4 className="text-sm font-medium flex items-center gap-2">
+            <Ticket className="h-4 w-4 text-accent" />
+            Apostas Individuais ({paidBets.length})
+          </h4>
           
-          <div className="space-y-2">
-            {paginatedBets.map((bet) => (
-              <div 
-                key={bet.id} 
-                className={`p-3 sm:p-4 rounded-lg border transition-colors ${
-                  bet.registrado 
-                    ? "bg-success/10 border-success/30" 
-                    : "bg-accent/5 border-accent/20"
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      id={`bet-${bet.id}`}
-                      checked={bet.registrado}
-                      disabled={updatingId === bet.id}
-                      onCheckedChange={() => toggleBetRegistrado(bet.id, bet.registrado)}
-                      className="h-5 w-5"
-                    />
-                    <Badge variant={bet.registrado ? "default" : "secondary"} className="text-xs">
-                      {bet.registrado && <Check className="h-3 w-3 mr-1" />}
-                      {bet.apelido}
-                    </Badge>
+          <ScrollArea className="h-[400px]">
+            <div className="space-y-2 pr-4">
+              {paidBets.map((bet) => (
+                <div 
+                  key={bet.id} 
+                  className={`p-3 sm:p-4 rounded-lg border transition-colors ${
+                    bet.registrado 
+                      ? "bg-success/10 border-success/30" 
+                      : "bg-accent/5 border-accent/20"
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        id={`bet-${bet.id}`}
+                        checked={bet.registrado}
+                        disabled={updatingId === bet.id}
+                        onCheckedChange={() => toggleBetRegistrado(bet.id, bet.registrado)}
+                        className="h-5 w-5"
+                      />
+                      <Badge variant={bet.registrado ? "default" : "secondary"} className="text-xs">
+                        {bet.registrado && <Check className="h-3 w-3 mr-1" />}
+                        {bet.apelido}
+                      </Badge>
+                    </div>
+                    <div className="text-left sm:text-right ml-8 sm:ml-0">
+                      <span className="text-sm text-muted-foreground">6 dezenas</span>
+                      {bet.registrado && bet.data_registro && (
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(bet.data_registro), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-left sm:text-right ml-8 sm:ml-0">
-                    <span className="text-sm text-muted-foreground">6 dezenas</span>
-                    {bet.registrado && bet.data_registro && (
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(bet.data_registro), "dd/MM 'às' HH:mm", { locale: ptBR })}
-                      </p>
-                    )}
+                  <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                    {bet.dezenas.sort((a, b) => a - b).map((num) => (
+                      <span
+                        key={num}
+                        className={`inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full text-xs sm:text-sm font-bold ${
+                          bet.registrado 
+                            ? "bg-success text-success-foreground" 
+                            : "bg-accent text-accent-foreground"
+                        }`}
+                      >
+                        {num.toString().padStart(2, "0")}
+                      </span>
+                    ))}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {bet.dezenas.sort((a, b) => a - b).map((num) => (
-                    <span
-                      key={num}
-                      className={`inline-flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-full text-xs sm:text-sm font-bold ${
-                        bet.registrado 
-                          ? "bg-success text-success-foreground" 
-                          : "bg-accent text-accent-foreground"
-                      }`}
-                    >
-                      {num.toString().padStart(2, "0")}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="h-4 w-4 mr-1" />
-                Anterior
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Página {currentPage} de {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-              >
-                Próxima
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
+              ))}
             </div>
-          )}
+          </ScrollArea>
         </div>
       )}
 
