@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, Loader2, Ticket, Check, CheckCheck } from "lucide-react";
+import { Copy, Loader2, Ticket, Check, CheckCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface SavedGame {
   id: string;
@@ -39,10 +40,14 @@ const formatCurrency = (value: number) => {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
+const ITEMS_PER_PAGE_OPTIONS = [5, 10, 20, 50];
+
 export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota, onBetRegistrationChange }: RegistrationSummaryProps) {
   const [savedGames, setSavedGames] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     fetchSavedGames();
@@ -169,6 +174,17 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
   const totalGamesCost = savedGames.reduce((sum, g) => sum + g.custo, 0);
   const individualCost = paidBets.length * valorCota;
   const totalCost = totalGamesCost + individualCost;
+
+  // Pagination logic for individual bets
+  const totalPages = Math.ceil(paidBets.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, paidBets.length);
+  const paginatedBets = paidBets.slice(startIndex, endIndex);
+
+  // Reset to page 1 when items per page changes or bets change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [itemsPerPage, paidBets.length]);
 
   const generateSummaryText = () => {
     const lines = [
@@ -321,12 +337,35 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
       {/* Individual Bets Section */}
       {paidBets.length > 0 && (
         <div className="space-y-3">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Ticket className="h-4 w-4 text-accent" />
-            Apostas Individuais ({paidBets.length})
-          </h4>
-          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-            {paidBets.map((bet) => (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Ticket className="h-4 w-4 text-accent" />
+              Apostas Individuais ({paidBets.length})
+            </h4>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                Exibindo {startIndex + 1}-{endIndex} de {paidBets.length}
+              </span>
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(value) => setItemsPerPage(Number(value))}
+              >
+                <SelectTrigger className="h-8 w-[70px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ITEMS_PER_PAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option.toString()}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            {paginatedBets.map((bet) => (
               <div 
                 key={bet.id} 
                 className={`p-3 sm:p-4 rounded-lg border transition-colors ${
@@ -375,6 +414,33 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
               </div>
             ))}
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
