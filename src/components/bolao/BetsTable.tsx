@@ -198,6 +198,7 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
+            <TableHead className="font-semibold w-12 text-center">#</TableHead>
             <TableHead className="font-semibold">Apelido</TableHead>
             <TableHead className="font-semibold">Celular</TableHead>
             <TableHead className="font-semibold">Dezenas</TableHead>
@@ -213,6 +214,9 @@ export function BetsTable({ bets, onPaymentUpdate }: BetsTableProps) {
               className="stagger-item"
               style={{ animationDelay: `${index * 40}ms` }}
             >
+              <TableCell className="text-center text-muted-foreground font-medium">
+                {index + 1}
+              </TableCell>
               <TableCell className="font-medium">
                 <div className="flex items-center gap-1">
                   <span className="truncate max-w-[150px]" title={bet.apelido}>{bet.apelido}</span>
