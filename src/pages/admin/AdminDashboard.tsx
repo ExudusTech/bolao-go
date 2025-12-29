@@ -31,6 +31,9 @@ interface Bolao {
   gestor_id: string;
   gestor_name?: string;
   gestor_email?: string;
+  valor_cota: number;
+  apostas_pagas?: number;
+  saldo?: number;
 }
 
 interface Profile {
@@ -99,13 +102,28 @@ export default function AdminDashboard() {
 
       if (apostasError) throw apostasError;
 
-      // Map gestor info to bolões
+      // Calculate apostas pagas per bolao
+      const apostasPerBolao: Record<string, { pagas: number; total_pago: number }> = {};
+      apostasData?.forEach((aposta) => {
+        if (!apostasPerBolao[aposta.bolao_id]) {
+          apostasPerBolao[aposta.bolao_id] = { pagas: 0, total_pago: 0 };
+        }
+        if (aposta.payment_status === 'paid') {
+          apostasPerBolao[aposta.bolao_id].pagas += 1;
+        }
+      });
+
+      // Map gestor info to bolões with payment stats
       const boloesWithGestor = (boloesData || []).map((bolao) => {
         const gestor = profilesData?.find((p) => p.id === bolao.gestor_id);
+        const stats = apostasPerBolao[bolao.id] || { pagas: 0, total_pago: 0 };
+        const saldo = stats.pagas * (bolao.valor_cota || 0);
         return {
           ...bolao,
           gestor_name: gestor?.name || "Desconhecido",
           gestor_email: gestor?.email || "",
+          apostas_pagas: stats.pagas,
+          saldo: saldo,
         };
       });
 
@@ -285,7 +303,10 @@ export default function AdminDashboard() {
 
               {/* Stats */}
               <div className="mb-8 grid gap-4 md:grid-cols-3">
-                <Card>
+                <Card 
+                  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30"
+                  onClick={() => setActiveTab("boloes")}
+                >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total de Bolões</CardTitle>
                     <Ticket className="h-4 w-4 text-muted-foreground" />
@@ -294,7 +315,10 @@ export default function AdminDashboard() {
                     <div className="text-2xl font-bold">{boloes.length}</div>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card 
+                  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30"
+                  onClick={() => setActiveTab("users")}
+                >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Gestores / Participantes</CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
@@ -303,7 +327,10 @@ export default function AdminDashboard() {
                     <div className="text-2xl font-bold">{profiles.length} / {participants.length}</div>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card 
+                  className="cursor-pointer transition-all hover:shadow-md hover:border-primary/30"
+                  onClick={() => setActiveTab("boloes")}
+                >
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total de Apostas</CardTitle>
                     <Ticket className="h-4 w-4 text-muted-foreground" />
@@ -354,6 +381,8 @@ export default function AdminDashboard() {
                           <TableHead>Bolão</TableHead>
                           <TableHead>Gestor</TableHead>
                           <TableHead>Apostas</TableHead>
+                          <TableHead>Pagas</TableHead>
+                          <TableHead>Saldo (R$)</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Criado em</TableHead>
                           <TableHead>Ações</TableHead>
@@ -374,6 +403,10 @@ export default function AdminDashboard() {
                               </div>
                             </TableCell>
                             <TableCell>{bolao.total_apostas}</TableCell>
+                            <TableCell>{bolao.apostas_pagas ?? 0}</TableCell>
+                            <TableCell className="font-medium text-green-600 dark:text-green-400">
+                              {(bolao.saldo ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </TableCell>
                             <TableCell>
                               <Badge variant={bolao.encerrado ? "secondary" : "default"}>
                                 {bolao.encerrado ? "Encerrado" : "Ativo"}
@@ -430,7 +463,7 @@ export default function AdminDashboard() {
                         ))}
                         {filteredBoloes.length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center py-8">
+                            <TableCell colSpan={8} className="text-center py-8">
                               Nenhum bolão encontrado
                             </TableCell>
                           </TableRow>
