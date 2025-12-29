@@ -115,13 +115,18 @@ function generateGameSuggestions(
   
   // Get ranked numbers
   const rankedMostVoted = analysis.fullRanking.filter(e => e.count > 0);
-  const rankedLeastVoted = [...rankedMostVoted].sort((a, b) => {
+  
+  // CRITICAL FIX: rankedLeastVoted should include ALL numbers (including 0 votes)
+  // sorted from least to most voted. This ensures "menos votados" games use
+  // the absolute least voted numbers (those with 0 votes first, then 1, etc.)
+  const rankedLeastVoted = [...analysis.fullRanking].sort((a, b) => {
     if (a.count !== b.count) return a.count - b.count;
     return a.number - b.number;
   });
   
   console.log(`Starting generation with budget R$ ${availableBudget.toFixed(2)}`);
   console.log(`Total voted numbers: ${rankedMostVoted.length}, Not voted: ${analysis.notVoted.length}`);
+  console.log(`Least voted (first 10): ${rankedLeastVoted.slice(0, 10).map(e => `${e.number}(${e.count})`).join(', ')}`);
   
   // Strategy: Generate games prioritizing variety of categories and sizes
   // Following Caixa rules: 6-20 numbers per game
@@ -361,7 +366,9 @@ function generateCustomGame(
   usedNumbersInCriteria: Set<number>
 ): { numbers: number[]; reason: string } | null {
   const rankedMostVoted = analysis.fullRanking.filter(e => e.count > 0);
-  const rankedLeastVoted = [...rankedMostVoted].sort((a, b) => {
+  
+  // CRITICAL FIX: Include ALL numbers for least voted (including 0 votes)
+  const rankedLeastVoted = [...analysis.fullRanking].sort((a, b) => {
     if (a.count !== b.count) return a.count - b.count;
     return a.number - b.number;
   });
