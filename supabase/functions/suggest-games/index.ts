@@ -116,10 +116,9 @@ function generateGameSuggestions(
   // Get ranked numbers
   const rankedMostVoted = analysis.fullRanking.filter(e => e.count > 0);
   
-  // CRITICAL FIX: rankedLeastVoted should include ALL numbers (including 0 votes)
-  // sorted from least to most voted. This ensures "menos votados" games use
-  // the absolute least voted numbers (those with 0 votes first, then 1, etc.)
-  const rankedLeastVoted = [...analysis.fullRanking].sort((a, b) => {
+  // CORRECT: rankedLeastVoted should include ONLY numbers that received at least 1 vote
+  // sorted from least to most voted. Numbers with 0 votes are "não votados", not "menos votados"
+  const rankedLeastVoted = [...rankedMostVoted].sort((a, b) => {
     if (a.count !== b.count) return a.count - b.count;
     return a.number - b.number;
   });
@@ -367,8 +366,8 @@ function generateCustomGame(
 ): { numbers: number[]; reason: string } | null {
   const rankedMostVoted = analysis.fullRanking.filter(e => e.count > 0);
   
-  // CRITICAL FIX: Include ALL numbers for least voted (including 0 votes)
-  const rankedLeastVoted = [...analysis.fullRanking].sort((a, b) => {
+  // CORRECT: Only numbers with at least 1 vote - numbers with 0 are "não votados"
+  const rankedLeastVoted = [...rankedMostVoted].sort((a, b) => {
     if (a.count !== b.count) return a.count - b.count;
     return a.number - b.number;
   });
