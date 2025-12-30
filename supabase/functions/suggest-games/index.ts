@@ -741,6 +741,14 @@ serve(async (req) => {
               reason = `Jogo com ${size} números NÃO VOTADOS (selecionados aleatoriamente dentre ${analysis.notVoted.length} disponíveis)`;
               console.log(`nao_votados game ${size} dezenas: randomly selected ${numbers.join(', ')} from ${analysis.notVoted.length} available`);
             } else {
+              // Add to skipped games when not enough numbers available
+              const price = lotteryConfig.prices[size];
+              skippedGames.push({
+                size,
+                categoria: 'nao_votados',
+                price,
+                reason: `Números insuficientes: apenas ${notVotedPool.length} números não votados disponíveis, mas o jogo precisa de ${size} números`,
+              });
               console.log(`Could not generate nao_votados game: ${size} numbers - not enough available numbers (got ${notVotedPool.length})`);
             }
           } else if (criteria === 'misto') {
@@ -816,6 +824,14 @@ serve(async (req) => {
               reason = `Jogo MISTO com ${size} números (${halfSize} mais votados + ${otherHalf} menos votados)`;
               console.log(`misto game ${size} dezenas: ${numbers.join(', ')} (after ${attempts + 1} attempts)`);
             } else {
+              // Add to skipped games when unique combination could not be found
+              const price = lotteryConfig.prices[size];
+              skippedGames.push({
+                size,
+                categoria: 'misto',
+                price,
+                reason: `Não foi possível gerar combinação única de ${size} números mistos após ${maxAttempts} tentativas`,
+              });
               console.log(`misto game ${size} dezenas: could not find unique combination after ${maxAttempts} attempts`);
             }
           }

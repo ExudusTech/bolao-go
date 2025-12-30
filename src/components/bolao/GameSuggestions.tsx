@@ -363,25 +363,33 @@ export function GameSuggestions({
           </div>
         </div>
 
-        {/* Skipped Games due to budget constraints */}
+        {/* Skipped Games due to budget constraints or other reasons */}
         {skippedGames.length > 0 && (
           <div className="p-4 rounded-lg bg-destructive/5 border border-destructive/20 space-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-destructive">⚠️ Jogos não gerados por falta de orçamento</span>
+              <span className="text-sm font-medium text-destructive">⚠️ Jogos não gerados</span>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
-              {skippedGames.map((skipped, index) => (
-                <div key={index} className="p-3 rounded-lg bg-background border text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{skipped.size} dezenas - {skipped.categoria === 'mais_votados' ? 'Mais Votados' : 'Menos Votados'}</span>
-                    <span className="text-destructive font-bold">R$ {skipped.price.toFixed(2)}</span>
+              {skippedGames.map((skipped, index) => {
+                const categoriaLabel = 
+                  skipped.categoria === 'mais_votados' ? 'Mais Votados' :
+                  skipped.categoria === 'menos_votados' ? 'Menos Votados' :
+                  skipped.categoria === 'nao_votados' ? 'Não Votados' :
+                  skipped.categoria === 'misto' ? 'Misto' : skipped.categoria;
+                
+                return (
+                  <div key={index} className="p-3 rounded-lg bg-background border text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{skipped.size} dezenas - {categoriaLabel}</span>
+                      <span className="text-destructive font-bold">R$ {skipped.price.toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{skipped.reason}</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{skipped.reason}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <p className="text-xs text-muted-foreground">
-              💡 Dica: Para gerar jogos maiores, aumente a arrecadação ou o valor da cota.
+              💡 Dica: Jogos "Não Votados" requerem números que nenhum participante escolheu. Se todos os números já foram votados, essa categoria não estará disponível.
             </p>
           </div>
         )}
