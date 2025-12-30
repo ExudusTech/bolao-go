@@ -21,6 +21,7 @@ interface Message {
 interface ParticipantMessagesPanelProps {
   bolaoId: string;
   participantApelido: string;
+  participantToken: string;
 }
 
 // Audio notification (simple beep)
@@ -46,7 +47,8 @@ const playNotificationSound = () => {
 
 export function ParticipantMessagesPanel({ 
   bolaoId, 
-  participantApelido 
+  participantApelido,
+  participantToken
 }: ParticipantMessagesPanelProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -138,14 +140,17 @@ export function ParticipantMessagesPanel({
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault();
     
-    if (!newMessage.trim() || !participantApelido) return;
+    if (!newMessage.trim() || !participantToken) {
+      toast.error("Você precisa estar autenticado para enviar mensagens");
+      return;
+    }
 
     setSending(true);
 
     try {
-      const { data, error } = await supabase.rpc('send_participant_message_by_apelido' as any, {
+      const { data, error } = await supabase.rpc('send_participant_message', {
         p_bolao_id: bolaoId,
-        p_apelido: participantApelido,
+        p_token: participantToken,
         p_content: newMessage.trim()
       });
 
