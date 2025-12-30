@@ -11,12 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sparkles, DollarSign, Loader2, Minus, Plus, AlertTriangle } from "lucide-react";
+import { Sparkles, DollarSign, Loader2, Minus, Plus, AlertTriangle, Info } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface GameSelection {
   size: number;
   criteria: "mais_votados" | "menos_votados" | "nao_votados" | "misto";
   quantity: number;
+  mistoCriteria?: ("mais_votados" | "menos_votados" | "nao_votados")[];
 }
 
 interface GameSelectionDialogProps {
@@ -27,13 +29,19 @@ interface GameSelectionDialogProps {
   prices: Record<number, number>;
   onConfirm: (selections: GameSelection[]) => void;
   isLoading?: boolean;
+  notVotedCount?: number;
 }
 
-const CRITERIA_OPTIONS = [
+const SIMPLE_CRITERIA_OPTIONS = [
   { value: "mais_votados", label: "Mais Votados", description: "Números com mais votos" },
   { value: "menos_votados", label: "Menos Votados", description: "Números com menos votos" },
   { value: "nao_votados", label: "Não Votados", description: "Números que ninguém escolheu" },
-  { value: "misto", label: "Misto", description: "Combinação de mais e menos votados" },
+] as const;
+
+const MISTO_CRITERIA_OPTIONS = [
+  { value: "mais_votados", label: "+ Votados" },
+  { value: "menos_votados", label: "- Votados" },
+  { value: "nao_votados", label: "Não Votados" },
 ] as const;
 
 export function GameSelectionDialog({
@@ -44,8 +52,10 @@ export function GameSelectionDialog({
   prices,
   onConfirm,
   isLoading = false,
+  notVotedCount = 0,
 }: GameSelectionDialogProps) {
   const [selections, setSelections] = useState<Map<string, GameSelection>>(new Map());
+  const [mistoConfigs, setMistoConfigs] = useState<Map<number, Set<string>>>(new Map()); // size -> selected misto criteria
   
   const availableBudget = totalBudget - individualGamesCost;
   
@@ -58,7 +68,14 @@ export function GameSelectionDialog({
       const price = prices[selection.size] || 0;
       cost += price * selection.quantity;
       if (selection.quantity > 0) {
-        list.push(selection);
+        // Add mistoCriteria if it's a misto selection
+        if (selection.criteria === 'misto') {
+          const mistoSet = mistoConfigs.get(selection.size);
+          const mistoCriteria = mistoSet ? Array.from(mistoSet) as ("mais_votados" | "menos_votados" | "nao_votados")[] : [];
+          list.push({ ...selection, mistoCriteria });
+        } else {
+          list.push(selection);
+        }
       }
     });
     
@@ -67,17 +84,20 @@ export function GameSelectionDialog({
       remainingBudget: availableBudget - cost,
       selectionsList: list,
     };
-  }, [selections, prices, availableBudget]);
+  }, [selections, prices, availableBudget, mistoConfigs]);
   
   // Get available game sizes sorted by price descending
   const gameSizes = useMemo(() => {
     return Object.entries(prices)
       .map(([size, price]) => ({ size: parseInt(size), price }))
-      .filter(({ size }) => size >= 6 && size <= 15) // Practical range
+      .filter(({ size }) => size >= 6 && size <= 15)
       .sort((a, b) => b.size - a.size);
   }, [prices]);
   
   const getSelectionKey = (size: number, criteria: string) => `${size}-${criteria}`;
+  
+  // Check if "Não Votados" can be used for a specific game size
+  const canUseNaoVotados = (size: number) => notVotedCount >= size;
   
   const handleQuantityChange = (size: number, criteria: string, delta: number) => {
     const key = getSelectionKey(size, criteria);
@@ -98,20 +118,63 @@ export function GameSelectionDialog({
     
     if (newQuantity === 0) {
       newSelections.delete(key);
+      // Also clear misto config for this size if it was misto
+      if (criteria === 'misto') {
+        const newMistoConfigs = new Map(mistoConfigs);
+        newMistoConfigs.delete(size);
+        setMistoConfigs(newMistoConfigs);
+      }
     } else {
       newSelections.set(key, {
         size,
         criteria: criteria as GameSelection["criteria"],
         quantity: newQuantity,
       });
+      // Initialize misto config if needed
+      if (criteria === 'misto' && !mistoConfigs.has(size)) {
+        const newMistoConfigs = new Map(mistoConfigs);
+        newMistoConfigs.set(size, new Set(['mais_votados', 'menos_votados'])); // Default selection
+        setMistoConfigs(newMistoConfigs);
+      }
     }
     
     setSelections(newSelections);
   };
   
+  const handleMistoCriteriaToggle = (size: number, criteriaValue: string) => {
+    const newMistoConfigs = new Map(mistoConfigs);
+    const currentSet = newMistoConfigs.get(size) || new Set<string>();
+    const newSet = new Set(currentSet);
+    
+    if (newSet.has(criteriaValue)) {
+      // Don't allow removing if it would leave less than 2 selected
+      if (newSet.size > 2) {
+        newSet.delete(criteriaValue);
+      }
+    } else {
+      // Check if adding nao_votados when there are not enough
+      if (criteriaValue === 'nao_votados' && !canUseNaoVotados(size)) {
+        return; // Can't add nao_votados - not enough numbers
+      }
+      newSet.add(criteriaValue);
+    }
+    
+    newMistoConfigs.set(size, newSet);
+    setMistoConfigs(newMistoConfigs);
+  };
+  
   const getQuantity = (size: number, criteria: string) => {
     const key = getSelectionKey(size, criteria);
     return selections.get(key)?.quantity || 0;
+  };
+  
+  const getMistoQuantity = (size: number) => {
+    const key = getSelectionKey(size, 'misto');
+    return selections.get(key)?.quantity || 0;
+  };
+  
+  const getMistoCriteria = (size: number): Set<string> => {
+    return mistoConfigs.get(size) || new Set(['mais_votados', 'menos_votados']);
   };
   
   const canAfford = (size: number) => {
@@ -127,9 +190,23 @@ export function GameSelectionDialog({
   
   const handleReset = () => {
     setSelections(new Map());
+    setMistoConfigs(new Map());
   };
   
   const totalGames = selectionsList.reduce((sum, s) => sum + s.quantity, 0);
+  
+  const getMistoLabel = (selection: GameSelection): string => {
+    if (!selection.mistoCriteria || selection.mistoCriteria.length === 0) {
+      return 'Misto';
+    }
+    const labels = selection.mistoCriteria.map(c => {
+      if (c === 'mais_votados') return '+V';
+      if (c === 'menos_votados') return '-V';
+      if (c === 'nao_votados') return 'NV';
+      return c;
+    });
+    return `Misto (${labels.join('+')})`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -166,6 +243,26 @@ export function GameSelectionDialog({
           </div>
         </div>
         
+        {/* Não Votados Info Banner */}
+        {notVotedCount === 0 && (
+          <div className="p-3 rounded-lg bg-warning/10 border border-warning/30 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium text-warning">Todos os números já foram votados</p>
+              <p className="text-muted-foreground text-xs">A categoria "Não Votados" está indisponível para este bolão.</p>
+            </div>
+          </div>
+        )}
+        {notVotedCount > 0 && notVotedCount < 15 && (
+          <div className="p-3 rounded-lg bg-muted/50 border flex items-start gap-2">
+            <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+            <p className="text-xs text-muted-foreground">
+              <strong>{notVotedCount}</strong> números não votados disponíveis. 
+              Jogos com mais de {notVotedCount} dezenas não poderão usar a categoria "Não Votados".
+            </p>
+          </div>
+        )}
+        
         {/* Selection Grid */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -175,28 +272,22 @@ export function GameSelectionDialog({
             </Button>
           </div>
           
-          {/* Header Row */}
-          <div className="hidden md:grid md:grid-cols-[120px_1fr_1fr_1fr_1fr] gap-2 px-4 text-xs text-muted-foreground font-medium">
-            <div>Tipo / Custo</div>
-            <div className="text-center">Mais Votados</div>
-            <div className="text-center">Menos Votados</div>
-            <div className="text-center">Não Votados</div>
-            <div className="text-center">Misto</div>
-          </div>
-          
           {/* Game Size Rows */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {gameSizes.map(({ size, price }) => {
               const affordable = canAfford(size);
+              const naoVotadosAvailable = canUseNaoVotados(size);
+              const mistoQty = getMistoQuantity(size);
+              const mistoCriteria = getMistoCriteria(size);
               
               return (
                 <div 
                   key={size} 
-                  className={`p-3 rounded-lg border ${affordable ? 'bg-background' : 'bg-muted/30 opacity-60'}`}
+                  className={`p-4 rounded-lg border ${affordable ? 'bg-background' : 'bg-muted/30 opacity-60'}`}
                 >
-                  {/* Mobile: Stacked layout */}
-                  <div className="md:hidden space-y-3">
-                    <div className="flex items-center justify-between">
+                  {/* Header: Size and Price */}
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
                       <Badge variant={affordable ? "default" : "secondary"}>
                         {size} dezenas
                       </Badge>
@@ -205,51 +296,102 @@ export function GameSelectionDialog({
                       </span>
                     </div>
                     {!affordable && (
-                      <p className="text-xs text-destructive flex items-center gap-1">
+                      <span className="text-xs text-destructive flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
-                        Orçamento insuficiente
-                      </p>
+                        Sem orçamento
+                      </span>
                     )}
-                    <div className="grid grid-cols-2 gap-2">
-                      {CRITERIA_OPTIONS.map((criteria) => (
-                        <div key={criteria.value} className="flex flex-col items-center gap-1 p-2 rounded bg-muted/30">
-                          <span className="text-xs text-muted-foreground">{criteria.label}</span>
+                  </div>
+                  
+                  {/* Simple Criteria Selectors */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                    {SIMPLE_CRITERIA_OPTIONS.map((criteria) => {
+                      const isNaoVotados = criteria.value === 'nao_votados';
+                      const isDisabled = isNaoVotados && !naoVotadosAvailable;
+                      const currentQty = getQuantity(size, criteria.value);
+                      
+                      return (
+                        <div 
+                          key={criteria.value} 
+                          className={`flex flex-col items-center gap-1 p-2 rounded ${isDisabled ? 'bg-muted/20 opacity-50' : 'bg-muted/30'}`}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground">{criteria.label}</span>
+                            {isNaoVotados && !naoVotadosAvailable && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <AlertTriangle className="h-3 w-3 text-warning" />
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Apenas {notVotedCount} números não votados.<br/>Precisa de {size} para este jogo.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <QuantitySelector
-                            quantity={getQuantity(size, criteria.value)}
+                            quantity={currentQty}
                             onIncrease={() => handleQuantityChange(size, criteria.value, 1)}
                             onDecrease={() => handleQuantityChange(size, criteria.value, -1)}
-                            disabled={!affordable && getQuantity(size, criteria.value) === 0}
+                            disabled={isDisabled || (!affordable && currentQty === 0)}
                           />
                         </div>
-                      ))}
+                      );
+                    })}
+                    
+                    {/* Misto Column */}
+                    <div className="flex flex-col items-center gap-1 p-2 rounded bg-accent/10 col-span-2 md:col-span-1">
+                      <span className="text-xs text-accent font-medium">Misto</span>
+                      <QuantitySelector
+                        quantity={mistoQty}
+                        onIncrease={() => handleQuantityChange(size, 'misto', 1)}
+                        onDecrease={() => handleQuantityChange(size, 'misto', -1)}
+                        disabled={!affordable && mistoQty === 0}
+                      />
                     </div>
                   </div>
                   
-                  {/* Desktop: Grid layout */}
-                  <div className="hidden md:grid md:grid-cols-[120px_1fr_1fr_1fr_1fr] gap-2 items-center">
-                    <div className="flex flex-col">
-                      <Badge variant={affordable ? "default" : "secondary"} className="w-fit">
-                        {size} dezenas
-                      </Badge>
-                      <span className={`text-sm font-bold mt-1 ${affordable ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        R$ {price.toFixed(2)}
-                      </span>
-                      {!affordable && (
-                        <span className="text-[10px] text-destructive">Sem orçamento</span>
-                      )}
-                    </div>
-                    
-                    {CRITERIA_OPTIONS.map((criteria) => (
-                      <div key={criteria.value} className="flex justify-center">
-                        <QuantitySelector
-                          quantity={getQuantity(size, criteria.value)}
-                          onIncrease={() => handleQuantityChange(size, criteria.value, 1)}
-                          onDecrease={() => handleQuantityChange(size, criteria.value, -1)}
-                          disabled={!affordable && getQuantity(size, criteria.value) === 0}
-                        />
+                  {/* Misto Criteria Configuration - shows when misto is selected */}
+                  {mistoQty > 0 && (
+                    <div className="p-3 rounded bg-accent/5 border border-accent/20">
+                      <p className="text-xs text-muted-foreground mb-2">Critérios do jogo Misto (selecione 2 ou 3):</p>
+                      <div className="flex flex-wrap gap-3">
+                        {MISTO_CRITERIA_OPTIONS.map((opt) => {
+                          const isNaoVotados = opt.value === 'nao_votados';
+                          const isDisabled = isNaoVotados && !naoVotadosAvailable;
+                          const isChecked = mistoCriteria.has(opt.value);
+                          const canUncheck = mistoCriteria.size > 2;
+                          
+                          return (
+                            <label 
+                              key={opt.value} 
+                              className={`flex items-center gap-2 cursor-pointer ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            >
+                              <Checkbox
+                                checked={isChecked}
+                                onCheckedChange={() => !isDisabled && handleMistoCriteriaToggle(size, opt.value)}
+                                disabled={isDisabled || (isChecked && !canUncheck)}
+                              />
+                              <span className="text-sm">{opt.label}</span>
+                              {isNaoVotados && !naoVotadosAvailable && (
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <AlertTriangle className="h-3 w-3 text-warning" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Apenas {notVotedCount} números não votados disponíveis</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              )}
+                            </label>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -263,7 +405,9 @@ export function GameSelectionDialog({
             <div className="flex flex-wrap gap-2">
               {selectionsList.map((selection, idx) => {
                 const price = prices[selection.size] || 0;
-                const criteriaLabel = CRITERIA_OPTIONS.find(c => c.value === selection.criteria)?.label;
+                const criteriaLabel = selection.criteria === 'misto' 
+                  ? getMistoLabel(selection)
+                  : SIMPLE_CRITERIA_OPTIONS.find(c => c.value === selection.criteria)?.label || selection.criteria;
                 return (
                   <Badge key={idx} variant="outline" className="border-accent text-accent">
                     {selection.quantity}x {selection.size} dez. ({criteriaLabel}) = R$ {(price * selection.quantity).toFixed(2)}

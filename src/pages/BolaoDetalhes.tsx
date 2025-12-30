@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, Link, useLocation } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -167,6 +167,16 @@ export default function BolaoDetalhes() {
 
   const paidApostas = apostas.filter(a => a.payment_status === 'paid');
   const totalArrecadado = paidApostas.length * (bolao?.valor_cota || 0);
+  
+  // Calculate not voted count for game selection dialog
+  const notVotedCount = useMemo(() => {
+    const maxNumber = LOTTERY_TYPES[bolao?.tipo_loteria as keyof typeof LOTTERY_TYPES]?.numberRange || 60;
+    const votedNumbers = new Set<number>();
+    paidApostas.forEach(a => {
+      a.dezenas.forEach(num => votedNumbers.add(num));
+    });
+    return maxNumber - votedNumbers.size;
+  }, [paidApostas, bolao?.tipo_loteria]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -920,6 +930,7 @@ export default function BolaoDetalhes() {
           prices={LOTTERY_TYPES[bolao.tipo_loteria as keyof typeof LOTTERY_TYPES]?.prices || {}}
           onConfirm={handleConfirmSelections}
           isLoading={loadingSuggestions}
+          notVotedCount={notVotedCount}
         />
       )}
     </AuthGuard>
