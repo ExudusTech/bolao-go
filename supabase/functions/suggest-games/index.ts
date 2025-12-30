@@ -525,6 +525,7 @@ serve(async (req) => {
         size: number;
         criteria: "mais_votados" | "menos_votados" | "nao_votados" | "misto";
         quantity: number;
+        mistoCriteria?: ("mais_votados" | "menos_votados" | "nao_votados")[];
       }>;
     };
 
@@ -670,7 +671,7 @@ serve(async (req) => {
       const sortedSelections = [...gameSelections].sort((a, b) => b.size - a.size);
       
       for (const selection of sortedSelections) {
-        const { size, criteria, quantity } = selection;
+        const { size, criteria, quantity, mistoCriteria } = selection;
         const price = lotteryConfig.prices[size];
         
         if (!price) continue;
@@ -752,49 +753,69 @@ serve(async (req) => {
               console.log(`Could not generate nao_votados game: ${size} numbers - not enough available numbers (got ${notVotedPool.length})`);
             }
           } else if (criteria === 'misto') {
-            // Mixed: half from most voted, half from least voted
-            // Important: Generate UNIQUE combinations by varying which numbers we pick
-            const halfSize = Math.ceil(size / 2);
-            const otherHalf = size - halfSize;
+            // Mixed: combine numbers from selected criteria (mais_votados, menos_votados, nao_votados)
+            // User can now select which criteria to include in the mix
+            const selectedCriteria = mistoCriteria && mistoCriteria.length >= 2 
+              ? mistoCriteria 
+              : ['mais_votados', 'menos_votados'] as const;
             
-            // Track numbers already used in other misto games to create diversity
-            const numbersInExistingMistoGames = new Set<number>();
-            suggestions.filter(s => s.categoria === 'misto').forEach(s => {
-              s.numbers.forEach(n => numbersInExistingMistoGames.add(n));
+            const criteriaCount = selectedCriteria.length;
+            const numbersPerCriteria = Math.ceil(size / criteriaCount);
+            
+            // Build description for the reason
+            const criteriaLabels = selectedCriteria.map(c => {
+              if (c === 'mais_votados') return '+votados';
+              if (c === 'menos_votados') return '-votados';
+              if (c === 'nao_votados') return 'não votados';
+              return c;
             });
             
-            // Strategy: For different game sizes, vary the starting positions
-            // to avoid smaller games being subsets of larger games
-            const mistoGamesCount = gamesPerCriteria['misto'];
-            
-            // Use offset to pick different numbers for each misto game attempt
-            // This ensures variety across different game sizes
-            let fromMost: number[] = [];
-            let fromLeast: number[] = [];
             let attempts = 0;
-            const maxAttempts = 10;
+            const maxAttempts = 15;
             
             while (attempts < maxAttempts) {
               const offset = attempts;
+              const combined: number[] = [];
+              const distribution: Record<string, number> = {};
               
-              // Try picking numbers with offset to create variety
-              // For mais_votados: skip some top numbers to get different ones
-              const candidatesMost = rankedMostVoted
-                .slice(offset, offset + halfSize + 5) // Get extra candidates
-                .map(e => e.number);
+              // Collect numbers from each selected criteria
+              for (let cIdx = 0; cIdx < selectedCriteria.length; cIdx++) {
+                const crit = selectedCriteria[cIdx];
+                // Calculate how many numbers to take from this criteria
+                // Last criteria gets remaining count to ensure total = size
+                const isLast = cIdx === selectedCriteria.length - 1;
+                const remaining = size - combined.length;
+                const toTake = isLast ? remaining : Math.min(numbersPerCriteria, remaining);
+                
+                let candidates: number[] = [];
+                
+                if (crit === 'mais_votados') {
+                  // Get from most voted, avoiding already selected numbers
+                  const available = rankedMostVoted
+                    .slice(offset, offset + toTake + 10)
+                    .filter(e => !combined.includes(e.number))
+                    .map(e => e.number);
+                  candidates = shuffleArray(available).slice(0, toTake);
+                } else if (crit === 'menos_votados') {
+                  // Get from least voted, avoiding already selected numbers
+                  const available = rankedLeastVoted
+                    .slice(offset, offset + toTake + 10)
+                    .filter(e => !combined.includes(e.number))
+                    .map(e => e.number);
+                  candidates = shuffleArray(available).slice(0, toTake);
+                } else if (crit === 'nao_votados') {
+                  // Get from not voted, avoiding already selected numbers
+                  const available = analysis.notVoted
+                    .filter(n => !combined.includes(n));
+                  candidates = shuffleArray(available).slice(0, toTake);
+                }
+                
+                combined.push(...candidates);
+                distribution[crit] = candidates.length;
+              }
               
-              // For menos_votados: also use offset
-              const candidatesLeast = rankedLeastVoted
-                .slice(offset, offset + otherHalf + 5)
-                .filter(e => !candidatesMost.includes(e.number))
-                .map(e => e.number);
-              
-              fromMost = candidatesMost.slice(0, halfSize);
-              fromLeast = candidatesLeast.slice(0, otherHalf);
-              
-              const combined = [...fromMost, ...fromLeast];
               if (combined.length >= size) {
-                const sortedCandidate = [...combined].sort((a, b) => a - b);
+                const sortedCandidate = [...combined.slice(0, size)].sort((a, b) => a - b);
                 const candidateKey = sortedCandidate.join(',');
                 
                 // Check if this game already exists
@@ -803,7 +824,7 @@ serve(async (req) => {
                   let isSubset = false;
                   for (const existing of suggestions.filter(s => s.categoria === 'misto')) {
                     const existingSet = new Set(existing.numbers);
-                    if (combined.every(n => existingSet.has(n))) {
+                    if (sortedCandidate.every(n => existingSet.has(n))) {
                       isSubset = true;
                       console.log(`Misto ${size} dezenas: combination [${sortedCandidate.join(', ')}] is subset of existing game, trying offset ${offset + 1}`);
                       break;
@@ -811,7 +832,7 @@ serve(async (req) => {
                   }
                   
                   if (!isSubset) {
-                    numbers = combined.slice(0, size);
+                    numbers = sortedCandidate;
                     break; // Found a valid unique combination
                   }
                 }
@@ -821,7 +842,7 @@ serve(async (req) => {
             }
             
             if (numbers && numbers.length === size) {
-              reason = `Jogo MISTO com ${size} números (${halfSize} mais votados + ${otherHalf} menos votados)`;
+              reason = `Jogo MISTO com ${size} números (${criteriaLabels.join(' + ')})`;
               console.log(`misto game ${size} dezenas: ${numbers.join(', ')} (after ${attempts + 1} attempts)`);
             } else {
               // Add to skipped games when unique combination could not be found
@@ -830,7 +851,7 @@ serve(async (req) => {
                 size,
                 categoria: 'misto',
                 price,
-                reason: `Não foi possível gerar combinação única de ${size} números mistos após ${maxAttempts} tentativas`,
+                reason: `Não foi possível gerar combinação única de ${size} números mistos (${criteriaLabels.join(' + ')}) após ${maxAttempts} tentativas`,
               });
               console.log(`misto game ${size} dezenas: could not find unique combination after ${maxAttempts} attempts`);
             }
