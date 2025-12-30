@@ -168,7 +168,9 @@ export function RegistrationSummary({ bolaoId, lotteryName, paidBets, valorCota,
   const totalGamesCount = savedGames.length + paidBets.length;
   const allRegistered = totalRegisteredCount === totalGamesCount;
   const totalGamesCost = savedGames.reduce((sum, g) => sum + g.custo, 0);
-  const individualCost = paidBets.length * valorCota;
+  // Apostas individuais sempre têm 6 dezenas = R$6,00 (preço fixo Mega-Sena)
+  const individualBetCost = 6.00;
+  const individualCost = paidBets.length * individualBetCost;
   const totalCost = totalGamesCost + individualCost;
 
 
