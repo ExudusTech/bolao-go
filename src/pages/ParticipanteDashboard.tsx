@@ -537,6 +537,7 @@ export default function ParticipanteDashboard() {
             <ParticipantMessagesPanel
               bolaoId={selectedBolao.id}
               participantApelido={session.apelido}
+              participantToken={session.token}
             />
           )}
         </main>

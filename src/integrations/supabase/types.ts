@@ -486,10 +486,6 @@ export type Database = {
         Args: { p_bolao_id: string; p_content: string; p_token: string }
         Returns: Json
       }
-      send_participant_message_by_apelido: {
-        Args: { p_apelido: string; p_bolao_id: string; p_content: string }
-        Returns: Json
-      }
       toggle_maintenance_mode: {
         Args: { p_enabled: boolean; p_message?: string }
         Returns: Json
