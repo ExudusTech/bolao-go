@@ -3,9 +3,68 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { Trophy, Star, CheckCircle2, X, Bell, Loader2, Gamepad2 } from "lucide-react";
+import { Trophy, Star, CheckCircle2, X, Bell, Loader2, Gamepad2, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+
+// Generate all combinations of k elements from array
+function generateCombinations<T>(arr: T[], k: number): T[][] {
+  if (k === 0) return [[]];
+  if (arr.length < k) return [];
+  if (arr.length === k) return [arr];
+  
+  const result: T[][] = [];
+  
+  function backtrack(start: number, current: T[]) {
+    if (current.length === k) {
+      result.push([...current]);
+      return;
+    }
+    for (let i = start; i < arr.length; i++) {
+      current.push(arr[i]);
+      backtrack(i + 1, current);
+      current.pop();
+    }
+  }
+  
+  backtrack(0, []);
+  return result;
+}
+
+// Get all winning combinations from a game with N numbers when matching the drawn numbers
+function getWinningCombinations(
+  gameDezenas: number[], 
+  drawnNumbers: number[]
+): { quinas: number[][]; quadras: number[][] } {
+  const matchingNumbers = gameDezenas.filter(n => drawnNumbers.includes(n));
+  const nonMatchingNumbers = gameDezenas.filter(n => !drawnNumbers.includes(n));
+  
+  const quinas: number[][] = [];
+  const quadras: number[][] = [];
+  
+  if (matchingNumbers.length === 6) {
+    // SENA: All 6 drawn numbers are in the game
+    // Quinas: 5 from matching + 1 from non-matching = C(6,5) * C(N-6,1)
+    const quinaCombsFromMatching = generateCombinations(matchingNumbers, 5);
+    for (const quinaBase of quinaCombsFromMatching) {
+      for (const extra of nonMatchingNumbers) {
+        quinas.push([...quinaBase, extra].sort((a, b) => a - b));
+      }
+    }
+    
+    // Quadras: 4 from matching + 2 from non-matching = C(6,4) * C(N-6,2)
+    const quadraCombsFromMatching = generateCombinations(matchingNumbers, 4);
+    const extraPairs = generateCombinations(nonMatchingNumbers, 2);
+    for (const quadraBase of quadraCombsFromMatching) {
+      for (const extraPair of extraPairs) {
+        quadras.push([...quadraBase, ...extraPair].sort((a, b) => a - b));
+      }
+    }
+  }
+  
+  return { quinas, quadras };
+}
 
 interface MatchResult {
   jogoId: string;
@@ -20,6 +79,11 @@ interface MatchResult {
     senas: number;
     quinas: number;
     quadras: number;
+  };
+  // Store actual winning combinations for display
+  combinacoesDetalhadas?: {
+    quinas: number[][];
+    quadras: number[][];
   };
 }
 
@@ -155,6 +219,8 @@ export function LotteryResultsChecker({
       
       // Calculate combinations for games with more than 6 numbers
       let combinacoes;
+      let combinacoesDetalhadas;
+      
       if (totalNumbers > 6 && quantidadeAcertos >= 4) {
         if (quantidadeAcertos === 6) {
           // Sena! Calculate all combinations
@@ -164,6 +230,8 @@ export function LotteryResultsChecker({
             quinas: combFromSena.quinas,
             quadras: combFromSena.quadras,
           };
+          // Generate detailed winning combinations
+          combinacoesDetalhadas = getWinningCombinations(game.dezenas, selectedNumbers);
         } else if (quantidadeAcertos === 5) {
           // Quina - calculate how many quinas and quadras
           const combFromQuina = calculateCombinationsFromQuina(totalNumbers, quantidadeAcertos);
@@ -194,6 +262,7 @@ export function LotteryResultsChecker({
         tipo: 'jogo',
         categoria: game.categoria,
         combinacoes,
+        combinacoesDetalhadas,
       });
     });
 
@@ -554,7 +623,7 @@ export function LotteryResultsChecker({
                           </div>
                           {/* Show combinations if applicable */}
                           {jogo.combinacoes && jogo.quantidadeAcertos >= 4 && (
-                            <div className="mt-2 pt-2 border-t border-border/50">
+                            <div className="mt-2 pt-2 border-t border-border/50 space-y-2">
                               <p className="text-xs text-muted-foreground">
                                 🎯 Com {jogo.quantidadeAcertos} acertos em {jogo.dezenas.length} dezenas:
                                 {jogo.combinacoes.senas > 0 && (
@@ -567,6 +636,84 @@ export function LotteryResultsChecker({
                                   <span className="ml-1 font-semibold text-primary">{jogo.combinacoes.quadras} quadras</span>
                                 )}
                               </p>
+                              
+                              {/* Show detailed combinations for SENA */}
+                              {jogo.combinacoesDetalhadas && jogo.quantidadeAcertos === 6 && (
+                                <Collapsible>
+                                  <CollapsibleTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="w-full text-xs h-7 gap-1">
+                                      <ChevronDown className="h-3 w-3" />
+                                      Ver todas as combinações premiadas (conforme regras da Caixa)
+                                    </Button>
+                                  </CollapsibleTrigger>
+                                  <CollapsibleContent className="space-y-3 pt-2">
+                                    {/* Quinas List */}
+                                    {jogo.combinacoesDetalhadas.quinas.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-success flex items-center gap-1">
+                                          🏆 {jogo.combinacoesDetalhadas.quinas.length} Quinas (5 acertos):
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
+                                          {jogo.combinacoesDetalhadas.quinas.map((quina, idx) => (
+                                            <div key={idx} className="flex items-center gap-1 bg-success/10 rounded px-2 py-1">
+                                              <span className="text-xs text-muted-foreground w-6">{idx + 1}.</span>
+                                              <div className="flex gap-0.5">
+                                                {quina.map((n) => (
+                                                  <span 
+                                                    key={n} 
+                                                    className={`text-xs font-mono px-1 rounded ${
+                                                      selectedNumbers.includes(n) 
+                                                        ? "bg-success text-success-foreground font-bold" 
+                                                        : "bg-muted"
+                                                    }`}
+                                                  >
+                                                    {n.toString().padStart(2, "0")}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    {/* Quadras List */}
+                                    {jogo.combinacoesDetalhadas.quadras.length > 0 && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-semibold text-primary flex items-center gap-1">
+                                          🎯 {jogo.combinacoesDetalhadas.quadras.length} Quadras (4 acertos):
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-48 overflow-y-auto">
+                                          {jogo.combinacoesDetalhadas.quadras.map((quadra, idx) => (
+                                            <div key={idx} className="flex items-center gap-1 bg-primary/10 rounded px-2 py-1">
+                                              <span className="text-xs text-muted-foreground w-6">{idx + 1}.</span>
+                                              <div className="flex gap-0.5">
+                                                {quadra.map((n) => (
+                                                  <span 
+                                                    key={n} 
+                                                    className={`text-xs font-mono px-1 rounded ${
+                                                      selectedNumbers.includes(n) 
+                                                        ? "bg-primary text-primary-foreground font-bold" 
+                                                        : "bg-muted"
+                                                    }`}
+                                                  >
+                                                    {n.toString().padStart(2, "0")}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    
+                                    <p className="text-[10px] text-muted-foreground italic">
+                                      * Cálculo conforme regras das Loterias da Caixa Econômica Federal: 
+                                      Cada combinação de 6 números dentro do jogo que inclua 5 ou 4 números sorteados é contabilizada como prêmio.
+                                    </p>
+                                  </CollapsibleContent>
+                                </Collapsible>
+                              )}
                             </div>
                           )}
                         </div>
