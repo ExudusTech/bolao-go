@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Trophy, Star, CheckCircle2, X, Bell, Loader2 } from "lucide-react";
+import { Trophy, Star, CheckCircle2, X, Bell, Loader2, Gamepad2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 interface MatchResult {
@@ -13,6 +13,14 @@ interface MatchResult {
   acertos: number[];
   quantidadeAcertos: number;
   apelido?: string;
+  tipo: 'aposta' | 'jogo';
+  categoria?: string;
+  // For games with more than 6 numbers, we calculate combinations
+  combinacoes?: {
+    senas: number;
+    quinas: number;
+    quadras: number;
+  };
 }
 
 interface ResultSummary {
@@ -21,6 +29,15 @@ interface ResultSummary {
   quadras: number;
   ternos: number;
   totalVerificado: number;
+  totalJogos: number;
+}
+
+interface SelectedGame {
+  id: string;
+  dezenas: number[];
+  categoria: string;
+  tipo: string;
+  custo: number;
 }
 
 interface LotteryResultsCheckerProps {
@@ -31,7 +48,47 @@ interface LotteryResultsCheckerProps {
   savedNumerosSorteados?: number[] | null;
   savedResultadoVerificado?: boolean;
   paidBets: Array<{ id: string; apelido: string; dezenas: number[] }>;
+  selectedGames?: SelectedGame[];
   onResultsVerified?: () => void;
+}
+
+// Helper function to calculate combinations C(n, k)
+function combinations(n: number, k: number): number {
+  if (k > n || k < 0) return 0;
+  if (k === 0 || k === n) return 1;
+  
+  let result = 1;
+  for (let i = 0; i < k; i++) {
+    result = result * (n - i) / (i + 1);
+  }
+  return Math.round(result);
+}
+
+// Calculate how many quinas/quadras come from a sena in a game with n numbers
+function calculateCombinationsFromSena(totalNumbers: number): { quinas: number; quadras: number } {
+  // If we have a sena (6 matches) in a game of N numbers:
+  // - Quinas: C(6,5) * C(N-6,1) = 6 * (N-6)
+  // - Quadras: C(6,4) * C(N-6,2) = 15 * C(N-6,2)
+  const nonMatching = totalNumbers - 6;
+  const quinas = 6 * nonMatching;
+  const quadras = 15 * combinations(nonMatching, 2);
+  return { quinas, quadras };
+}
+
+// Calculate combinations when we have exactly 5 matches
+function calculateCombinationsFromQuina(totalNumbers: number, matchingNumbers: number): { quinas: number; quadras: number } {
+  if (matchingNumbers < 5) return { quinas: 0, quadras: 0 };
+  
+  // Number of non-matching numbers selected
+  const nonMatchingSelected = totalNumbers - matchingNumbers;
+  
+  // Quinas: we pick all 5 matching + 1 from non-matching = C(nonMatchingSelected, 1)
+  const quinas = nonMatchingSelected > 0 ? nonMatchingSelected : 1;
+  
+  // Quadras: C(5,4) * C(nonMatchingSelected, 2) = 5 * C(nonMatchingSelected, 2)
+  const quadras = 5 * combinations(nonMatchingSelected, 2);
+  
+  return { quinas, quadras };
 }
 
 export function LotteryResultsChecker({ 
@@ -40,6 +97,7 @@ export function LotteryResultsChecker({
   savedNumerosSorteados,
   savedResultadoVerificado,
   paidBets,
+  selectedGames = [],
   onResultsVerified
 }: LotteryResultsCheckerProps) {
   const [selectedNumbers, setSelectedNumbers] = useState<number[]>(savedNumerosSorteados || []);
@@ -74,35 +132,98 @@ export function LotteryResultsChecker({
       return;
     }
 
-    if (paidBets.length === 0) {
-      toast.error("Não há apostas pagas para verificar");
-      return;
-    }
+    const allResults: MatchResult[] = [];
 
-    const matchResults: MatchResult[] = paidBets.map(bet => {
+    // Process individual bets (always 6 numbers)
+    paidBets.forEach(bet => {
       const acertos = bet.dezenas.filter(num => selectedNumbers.includes(num));
-      return {
+      allResults.push({
         jogoId: bet.id,
         dezenas: bet.dezenas,
         acertos,
         quantidadeAcertos: acertos.length,
         apelido: bet.apelido,
-      };
+        tipo: 'aposta',
+      });
     });
 
-    // Calculate summary
-    const senas = matchResults.filter(r => r.quantidadeAcertos === 6).length;
-    const quinas = matchResults.filter(r => r.quantidadeAcertos === 5).length;
-    const quadras = matchResults.filter(r => r.quantidadeAcertos === 4).length;
-    const ternos = matchResults.filter(r => r.quantidadeAcertos === 3).length;
+    // Process selected games (can have 6-20 numbers)
+    selectedGames.forEach(game => {
+      const acertos = game.dezenas.filter(num => selectedNumbers.includes(num));
+      const quantidadeAcertos = acertos.length;
+      const totalNumbers = game.dezenas.length;
+      
+      // Calculate combinations for games with more than 6 numbers
+      let combinacoes;
+      if (totalNumbers > 6 && quantidadeAcertos >= 4) {
+        if (quantidadeAcertos === 6) {
+          // Sena! Calculate all combinations
+          const combFromSena = calculateCombinationsFromSena(totalNumbers);
+          combinacoes = {
+            senas: 1,
+            quinas: combFromSena.quinas,
+            quadras: combFromSena.quadras,
+          };
+        } else if (quantidadeAcertos === 5) {
+          // Quina - calculate how many quinas and quadras
+          const combFromQuina = calculateCombinationsFromQuina(totalNumbers, quantidadeAcertos);
+          combinacoes = {
+            senas: 0,
+            quinas: combFromQuina.quinas,
+            quadras: combFromQuina.quadras,
+          };
+        } else if (quantidadeAcertos === 4) {
+          // Quadra - calculate combinations
+          const nonMatchingSelected = totalNumbers - quantidadeAcertos;
+          // C(4,4) * C(nonMatchingSelected, 2) = 1 * C(n,2)
+          const quadras = combinations(nonMatchingSelected, 2);
+          combinacoes = {
+            senas: 0,
+            quinas: 0,
+            quadras: quadras > 0 ? quadras : 1,
+          };
+        }
+      }
 
-    setResults(matchResults.sort((a, b) => b.quantidadeAcertos - a.quantidadeAcertos));
+      allResults.push({
+        jogoId: game.id,
+        dezenas: game.dezenas,
+        acertos,
+        quantidadeAcertos,
+        apelido: `Jogo ${game.dezenas.length} dezenas`,
+        tipo: 'jogo',
+        categoria: game.categoria,
+        combinacoes,
+      });
+    });
+
+    // Calculate summary - for games with combinations, use those values
+    let senas = 0;
+    let quinas = 0;
+    let quadras = 0;
+    let ternos = 0;
+
+    allResults.forEach(r => {
+      if (r.combinacoes) {
+        senas += r.combinacoes.senas;
+        quinas += r.combinacoes.quinas;
+        quadras += r.combinacoes.quadras;
+      } else {
+        if (r.quantidadeAcertos === 6) senas++;
+        else if (r.quantidadeAcertos === 5) quinas++;
+        else if (r.quantidadeAcertos === 4) quadras++;
+        else if (r.quantidadeAcertos === 3) ternos++;
+      }
+    });
+
+    setResults(allResults.sort((a, b) => b.quantidadeAcertos - a.quantidadeAcertos));
     setSummary({
       senas,
       quinas,
       quadras,
       ternos,
-      totalVerificado: matchResults.length,
+      totalVerificado: paidBets.length + selectedGames.length,
+      totalJogos: selectedGames.length,
     });
 
     toast.success("Resultado verificado!");
@@ -374,52 +495,130 @@ export function LotteryResultsChecker({
                 </div>
               </div>
               <p className="text-center text-sm text-muted-foreground">
-                {summary.totalVerificado} apostas verificadas
+                {summary.totalVerificado} jogos verificados 
+                {summary.totalJogos > 0 && ` (${paidBets.length} apostas + ${summary.totalJogos} jogos do bolão)`}
               </p>
             </div>
 
-            {/* Individual Bets Results */}
+            {/* Individual Results - Separated by type */}
             {results.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium">Detalhamento por Aposta</h4>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {results.map((aposta) => (
-                    <div 
-                      key={aposta.jogoId} 
-                      className={`p-3 rounded-lg border ${
-                        aposta.quantidadeAcertos >= 4 
-                          ? "bg-success/10 border-success/30" 
-                          : aposta.quantidadeAcertos >= 3 
-                            ? "bg-orange-500/10 border-orange-500/30"
-                            : "bg-muted/30"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium">{aposta.apelido}</span>
-                        <Badge 
-                          variant={getMatchBadgeVariant(aposta.quantidadeAcertos)} 
-                          className={getMatchColor(aposta.quantidadeAcertos)}
+              <div className="space-y-4">
+                {/* Selected Games (if any) */}
+                {selectedGames.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium flex items-center gap-2">
+                      <Gamepad2 className="h-4 w-4 text-primary" />
+                      Jogos do Bolão ({selectedGames.length})
+                    </h4>
+                    <div className="space-y-2">
+                      {results.filter(r => r.tipo === 'jogo').map((jogo) => (
+                        <div 
+                          key={jogo.jogoId} 
+                          className={`p-3 rounded-lg border ${
+                            jogo.quantidadeAcertos >= 4 
+                              ? "bg-success/10 border-success/30" 
+                              : jogo.quantidadeAcertos >= 3 
+                                ? "bg-orange-500/10 border-orange-500/30"
+                                : "bg-muted/30"
+                          }`}
                         >
-                          {getMatchLabel(aposta.quantidadeAcertos)}
-                        </Badge>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {aposta.dezenas.sort((a, b) => a - b).map((num) => (
-                          <span
-                            key={num}
-                            className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
-                              aposta.acertos.includes(num)
-                                ? "bg-success text-success-foreground ring-2 ring-success"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {num.toString().padStart(2, "0")}
-                          </span>
-                        ))}
-                      </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">{jogo.apelido}</span>
+                              {jogo.categoria && (
+                                <Badge variant="outline" className="text-xs">
+                                  {jogo.categoria}
+                                </Badge>
+                              )}
+                            </div>
+                            <Badge 
+                              variant={getMatchBadgeVariant(jogo.quantidadeAcertos)} 
+                              className={getMatchColor(jogo.quantidadeAcertos)}
+                            >
+                              {getMatchLabel(jogo.quantidadeAcertos)}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {jogo.dezenas.sort((a, b) => a - b).map((num) => (
+                              <span
+                                key={num}
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                                  jogo.acertos.includes(num)
+                                    ? "bg-success text-success-foreground ring-2 ring-success"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {num.toString().padStart(2, "0")}
+                              </span>
+                            ))}
+                          </div>
+                          {/* Show combinations if applicable */}
+                          {jogo.combinacoes && jogo.quantidadeAcertos >= 4 && (
+                            <div className="mt-2 pt-2 border-t border-border/50">
+                              <p className="text-xs text-muted-foreground">
+                                🎯 Com {jogo.quantidadeAcertos} acertos em {jogo.dezenas.length} dezenas:
+                                {jogo.combinacoes.senas > 0 && (
+                                  <span className="ml-1 font-semibold text-yellow-600">{jogo.combinacoes.senas} sena</span>
+                                )}
+                                {jogo.combinacoes.quinas > 0 && (
+                                  <span className="ml-1 font-semibold text-success">{jogo.combinacoes.quinas} quinas</span>
+                                )}
+                                {jogo.combinacoes.quadras > 0 && (
+                                  <span className="ml-1 font-semibold text-primary">{jogo.combinacoes.quadras} quadras</span>
+                                )}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                )}
+
+                {/* Individual Bets */}
+                {paidBets.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-medium">Detalhamento por Aposta ({paidBets.length})</h4>
+                    <div className="space-y-2 max-h-96 overflow-y-auto">
+                      {results.filter(r => r.tipo === 'aposta').map((aposta) => (
+                        <div 
+                          key={aposta.jogoId} 
+                          className={`p-3 rounded-lg border ${
+                            aposta.quantidadeAcertos >= 4 
+                              ? "bg-success/10 border-success/30" 
+                              : aposta.quantidadeAcertos >= 3 
+                                ? "bg-orange-500/10 border-orange-500/30"
+                                : "bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">{aposta.apelido}</span>
+                            <Badge 
+                              variant={getMatchBadgeVariant(aposta.quantidadeAcertos)} 
+                              className={getMatchColor(aposta.quantidadeAcertos)}
+                            >
+                              {getMatchLabel(aposta.quantidadeAcertos)}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {aposta.dezenas.sort((a, b) => a - b).map((num) => (
+                              <span
+                                key={num}
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold ${
+                                  aposta.acertos.includes(num)
+                                    ? "bg-success text-success-foreground ring-2 ring-success"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {num.toString().padStart(2, "0")}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </>

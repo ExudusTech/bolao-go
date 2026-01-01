@@ -57,6 +57,15 @@ interface Aposta {
   data_registro: string | null;
 }
 
+interface JogoSelecionado {
+  id: string;
+  dezenas: number[];
+  categoria: string;
+  tipo: string;
+  custo: number;
+  registrado: boolean;
+}
+
 interface NumberAnalysis {
   mostVoted: Array<{ number: number; count: number }>;
   leastVoted: Array<{ number: number; count: number }>;
@@ -85,6 +94,7 @@ export default function BolaoDetalhes() {
   const { isAdmin } = useAdmin();
   const [bolao, setBolao] = useState<Bolao | null>(null);
   const [apostas, setApostas] = useState<Aposta[]>([]);
+  const [jogosSelecionados, setJogosSelecionados] = useState<JogoSelecionado[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -102,9 +112,10 @@ export default function BolaoDetalhes() {
   const fetchData = useCallback(async () => {
     if (!id) return;
 
-    const [bolaoRes, apostasRes] = await Promise.all([
+    const [bolaoRes, apostasRes, jogosRes] = await Promise.all([
       supabase.from("boloes").select("*").eq("id", id).single(),
       supabase.from("apostas").select("*").eq("bolao_id", id).order("created_at", { ascending: false }),
+      supabase.from("jogos_selecionados").select("*").eq("bolao_id", id).order("created_at", { ascending: true }),
     ]);
 
     if (!bolaoRes.error && bolaoRes.data) {
@@ -117,6 +128,10 @@ export default function BolaoDetalhes() {
 
     if (!apostasRes.error && apostasRes.data) {
       setApostas(apostasRes.data);
+    }
+
+    if (!jogosRes.error && jogosRes.data) {
+      setJogosSelecionados(jogosRes.data);
     }
 
     setLoading(false);
@@ -893,6 +908,13 @@ export default function BolaoDetalhes() {
                 savedNumerosSorteados={bolao.numeros_sorteados}
                 savedResultadoVerificado={bolao.resultado_verificado || false}
                 paidBets={paidApostas.map(a => ({ id: a.id, apelido: a.apelido, dezenas: a.dezenas }))}
+                selectedGames={jogosSelecionados.map(j => ({ 
+                  id: j.id, 
+                  dezenas: j.dezenas, 
+                  categoria: j.categoria, 
+                  tipo: j.tipo,
+                  custo: j.custo
+                }))}
                 onResultsVerified={fetchData}
               />
             </CollapsibleSection>
